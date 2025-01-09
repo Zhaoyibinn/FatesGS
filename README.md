@@ -14,7 +14,7 @@
 </div>
 <p align="center">
   <a href="https://arxiv.org/abs/2501.04628" target='_blank'><img src="http://img.shields.io/badge/cs.CV-arXiv%3A2501.04628-b31b1b"></a>
-  <a href="" target='_blank'><img src="http://img.shields.io/badge/Project_Page-😇-lightblue"></a>
+  <a href="https://alvin528.github.io/FatesGS/" target='_blank'><img src="http://img.shields.io/badge/Project_Page-😇-lightblue"></a>
 </p>
 
 ## TODO
