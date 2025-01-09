@@ -23,6 +23,8 @@
 
 ## Overview
 
+<div align="center"><img src="./media/overview.png" width=100%></div>
+
 We propose FatesGS for sparse-view surface reconstruction, taking full advantage of the Gaussian Splatting pipeline. Compared with previous methods, our approach neither requires long-term per-scene optimization nor costly pre-training.
  
 ## Citation
