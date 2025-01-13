@@ -1,5 +1,5 @@
 <h2 align="center">
-  😇FatesGS: Fast and Accurate Sparse-View Surface Reconstruction using Gaussian Splatting with Depth-Feature Consistency
+  😇FatesGS: Fast and Accurate Sparse-View Surface Reconstruction Using Gaussian Splatting with Depth-Feature Consistency
 </h2>
 <h4 align="center">AAAI 2025</h4>
 <div align="center">
