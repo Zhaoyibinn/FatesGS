@@ -33,9 +33,9 @@ If you find our work useful in your research, please consider citing:
 
 ```bibtex
 @inproceedings{huang2025fatesgs,
-    title={FatesGS: Fast and Accurate Sparse-View Surface Reconstruction using Gaussian Splatting with Depth-Feature Consistency},
+    title={FatesGS: Fast and Accurate Sparse-View Surface Reconstruction Using Gaussian Splatting with Depth-Feature Consistency},
     author={Han Huang and Yulun Wu and Chao Deng and Ge Gao and Ming Gu and Yu-Shen Liu},
-    booktitle={AAAI Conference on Artificial Intelligence},
+    booktitle={Proceedings of the AAAI Conference on Artificial Intelligence},
     year={2025}
 }
 ```
