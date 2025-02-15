@@ -1,7 +1,7 @@
 <h2 align="center">
   😇FatesGS: Fast and Accurate Sparse-View Surface Reconstruction Using Gaussian Splatting with Depth-Feature Consistency
 </h2>
-<h4 align="center">AAAI 2025</h4>
+<h4 align="center">AAAI 2025 Oral</h4>
 <div align="center">
   <a href='https://github.com/alvin528' target='_blank'>Han Huang</a>*&emsp;
   <a href='https://yulunwu0108.github.io/' target='_blank'>Yulun Wu</a>*&emsp;
