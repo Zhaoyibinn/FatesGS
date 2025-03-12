@@ -17,16 +17,12 @@
   <a href="https://alvin528.github.io/FatesGS/" target='_blank'><img src="http://img.shields.io/badge/Project_Page-😇-lightblue"></a>
 </p>
 
-## TODO
-
-- [ ] Code release
-
 ## Overview
 
 <div align="center"><img src="./media/overview.png" width=100%></div>
 
 We propose FatesGS for sparse-view surface reconstruction, taking full advantage of the Gaussian Splatting pipeline. Compared with previous methods, our approach neither requires long-term per-scene optimization nor costly pre-training.
- 
+
 ## Citation
 
 If you find our work useful in your research, please consider citing:
@@ -39,3 +35,7 @@ If you find our work useful in your research, please consider citing:
     year={2025}
 }
 ```
+
+## Acknowledgement
+
+This implementation is based on [2DGS](https://github.com/hbb1/2d-gaussian-splatting), [3DGS](https://github.com/graphdeco-inria/gaussian-splatting) and [MVSDF](https://github.com/jzhangbs/MVSDF). Thanks to the authors for their great work.
