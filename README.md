@@ -23,6 +23,63 @@
 
 We propose FatesGS for sparse-view surface reconstruction, taking full advantage of the Gaussian Splatting pipeline. Compared with previous methods, our approach neither requires long-term per-scene optimization nor costly pre-training.
 
+## Installation
+
+```
+conda create -n fatesgs python=3.8
+conda activate fatesgs
+pip install -r requirements.txt
+```
+
+## Dataset
+
+### DTU dataset
+
+1. Download the processed DTU dataset from [this link](https://drive.google.com/drive/folders/143jIT9DJN17gigp3uxBtqBv6UBdcO7Lm?usp=drive_link). The data structure should be like:
+
+```
+|-- DTU
+    |-- <set_name, e.g. set_23_24_33>
+        |-- <scan_name, e.g. scan24>
+            |-- pair.txt
+            |-- images
+                |-- 0000.png
+                |-- 0001.png
+                ...
+            |-- sparse <COLMAP sparse reconstruction>
+                |-- 0
+                    |-- cameras.txt
+                    |-- images.txt
+                    |-- points3D.txt
+            |-- dense <COLMAP dense reconstruction>
+                |-- fused.ply
+                ...
+            |-- depth_npy <monocular depth maps (to be generated)>
+                |-- 0000_pred.npy
+                |-- 0001_pred.npy
+                ...
+        ...
+    ...
+```
+
+2. Following [Marigold](https://github.com/prs-eth/Marigold) to generate the estimated monocular depth maps. Put the `.npy` format depth maps under the `depth_npy` folder. You may also use more advanced depth estimation models for better performance. (P.S. The size of the depth maps used as priors ought to be consistent with those of the rendered color images during the Gaussian Splatting training process.)
+
+## Running
+
+- Training
+
+```
+CUDA_VISIBLE_DEVICES=0
+python train.py -s <source_path> -m <model_path> -r 2
+```
+
+- Extract mesh
+
+```
+CUDA_VISIBLE_DEVICES=0
+python render.py -s <source_path> -m <model_path> -r 2 --skip_test --skip_train
+```
+
 ## Citation
 
 If you find our work useful in your research, please consider citing:
