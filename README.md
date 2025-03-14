@@ -73,7 +73,7 @@ CUDA_VISIBLE_DEVICES=0
 python train.py -s <source_path> -m <model_path> -r 2
 ```
 
-- Extract mesh
+- Mesh extraction
 
 ```
 CUDA_VISIBLE_DEVICES=0
