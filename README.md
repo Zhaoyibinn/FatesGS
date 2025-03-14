@@ -62,7 +62,7 @@ pip install -r requirements.txt
     ...
 ```
 
-2. Following [Marigold](https://github.com/prs-eth/Marigold) to generate the estimated monocular depth maps. Put the `.npy` format depth maps under the `depth_npy` folder. You may also use more advanced depth estimation models for better performance. (P.S. The size of the depth maps used as priors ought to be consistent with those of the rendered color images during the Gaussian Splatting training process.)
+2. Follow [Marigold](https://github.com/prs-eth/Marigold) to generate the estimated monocular depth maps. Put the `.npy` format depth maps under the `depth_npy` folder. You may also use more advanced depth estimation models for better performance. (P.S. The size of the depth maps used as priors ought to be consistent with those of the rendered color images during the Gaussian Splatting training process.)
 
 ## Running
 
