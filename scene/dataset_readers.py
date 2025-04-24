@@ -177,6 +177,9 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
                               image_path=image_path, image_name=image_name, width=width, height=height,
                               feat=[feats[int(image_name)] for feats in feats_list],
                               pair=[int(idx) for idx in pair], mono_depth=depth, mask=mask)
+        # cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+        #                       image_path=image_path, image_name=image_name, width=width, height=height,
+        #                       feat=[feats[int(image_name)] for feats in feats_list], mono_depth=depth, mask=mask)
         cam_infos.append(cam_info)
     sys.stdout.write('\n')
     return cam_infos
