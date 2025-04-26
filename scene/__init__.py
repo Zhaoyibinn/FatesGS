@@ -18,6 +18,8 @@ from scene.gaussian_model import GaussianModel
 from arguments import ModelParams
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
 
+real_idx = [0,24,48]
+
 class Scene:
 
     gaussians : GaussianModel
@@ -29,6 +31,7 @@ class Scene:
         self.model_path = args.model_path
         self.loaded_iter = None
         self.gaussians = gaussians
+        self.args = args
 
         if load_iteration:
             if load_iteration == -1:
@@ -95,8 +98,12 @@ class Scene:
 
     def getTrainCamerasSource(self, cam_img_name, scale=1.0):
         cameras = self.train_cameras[scale]
-        ref_camera = cameras[int(cam_img_name)]
-        return [camera for camera in cameras if int(camera.image_name) in ref_camera.pair]
+        if self.args.diff:
+            ref_camera = cameras[real_idx.index(int(cam_img_name))]
+            return cameras
+        else:
+            ref_camera = cameras[int(cam_img_name)]
+            return [camera for camera in cameras if int(camera.image_name) in ref_camera.pair]
 
     def getTestCameras(self, scale=1.0):
         return self.test_cameras[scale]

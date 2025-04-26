@@ -75,6 +75,9 @@ def getNerfppNorm(cam_info):
 def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_mask, args):
     cam_infos = []
 
+    if args.diff:
+        real_idx = [0,24,48]
+    
     depths_folder = os.path.join(path, "depth_npy")
     masks_folder = os.path.join(path, "mask")
 
@@ -85,7 +88,18 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
             imgs.extend(glob(os.path.join(path, ext)))
         return imgs
 
-    image_paths = sorted(glob_imgs(images_folder))
+    image_paths_all = sorted(glob_imgs(images_folder))
+
+    if not args.diff:
+        image_paths = image_paths_all
+    else:
+        image_paths = []
+        for idx,image_path in enumerate(image_paths_all):
+            if idx in real_idx:
+                image_paths.append(image_path)
+            
+
+    
 
     n_images = len(image_paths)
 
@@ -111,24 +125,27 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
             resolution = (int(image_pil.size[0] / scale), int(image_pil.size[1] / scale))
             image = torch.cat([PILtoTorch(im, resolution) for im in image_pil.split()[:3]], dim=0)
             rgb_2xd[i, :, :image.shape[1], :image.shape[2]] = image
-
+            # 这里似乎限制了图片大小,只放进去但是不一定塞满
         mean = torch.tensor([0.485, 0.456, 0.406]).float()
         std = torch.tensor([0.229, 0.224, 0.225]).float()
         rgb_2xd = (rgb_2xd / 2 + 0.5 - mean.view(1, 3, 1, 1)) / std.view(1, 3, 1, 1)
+        
 
         feats = []
         feat_eval_bs = 20
         for start_i in range(0, n_images, feat_eval_bs):
             eval_batch = rgb_2xd[start_i:start_i + feat_eval_bs]
-            feat2 = feat_ext(eval_batch.cuda())[2].detach().cpu()
+            feat2 = feat_ext(eval_batch.cuda())[2].detach().cpu() # 通道数32 size减半
             feats.append(feat2)
         feats = torch.cat(feats, dim=0)
         feats = feats[..., :(ori_h // 2) // scale, :(ori_w // 2) // scale]
         feats_list.append(feats)
+        # 这里读取图片之后用一个(似乎参考了MVSNET和UNET)特征提取网络
 
     pairs = load_pair(os.path.join(images_folder, "..", "pair.txt"))
 
     for idx, key in enumerate(cam_extrinsics):
+
         sys.stdout.write('\r')
         # the exact output you're looking for:
         sys.stdout.write("Reading camera {}/{}".format(idx+1, len(cam_extrinsics)))
@@ -157,10 +174,16 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
 
         image_path = os.path.join(images_folder, os.path.basename(extr.name))
         image_name = os.path.basename(image_path).split(".")[0]
+
+        if args.diff:
+            if int(image_name) not in real_idx:
+                continue
+
         image = Image.open(image_path)
 
         depth_path = os.path.join(depths_folder, image_name + "_pred.npy")
         depth = None
+        # 这边除了常规的还增加了深度图
 
         if os.path.exists(depth_path):
             depth = np.load(depth_path)
@@ -172,11 +195,18 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
                 mask = Image.open(mask_path)
 
         pair = pairs[str(int(image_name))]['pair'][:2]
+        
 
-        cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+        if args.diff:
+            cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                               image_path=image_path, image_name=image_name, width=width, height=height,
-                              feat=[feats[int(image_name)] for feats in feats_list],
+                              feat=[feats[real_idx.index(int(image_name))] for feats in feats_list],
                               pair=[int(idx) for idx in pair], mono_depth=depth, mask=mask)
+        else:
+            cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+                                image_path=image_path, image_name=image_name, width=width, height=height,
+                                feat=[feats[int(image_name)] for feats in feats_list],
+                                pair=[int(idx) for idx in pair], mono_depth=depth, mask=mask)
         # cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
         #                       image_path=image_path, image_name=image_name, width=width, height=height,
         #                       feat=[feats[int(image_name)] for feats in feats_list], mono_depth=depth, mask=mask)

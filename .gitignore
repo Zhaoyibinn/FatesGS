@@ -14,3 +14,4 @@ data
 scripts
 *.egg-info
 DTU
+*.pth

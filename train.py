@@ -266,7 +266,11 @@ if __name__ == "__main__":
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
+    # parser.add_argument("--diff", type=bool, default = False)
+    # 是否采用扩散模型
+
     args = parser.parse_args(sys.argv[1:])
+    # lp.use_diff = args.diff
     args.save_iterations.append(args.iterations)
 
     print("Optimizing " + args.model_path)
