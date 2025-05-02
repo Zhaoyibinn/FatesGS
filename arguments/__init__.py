@@ -88,6 +88,7 @@ class OptimizationParams(ParamGroup):
         self.lambda_normal = 0.05
         self.lambda_feat = 1.5
         self.lambda_depth = 10.0
+        self.lambda_local_pearson = 0.00
         self.opacity_cull = 0.1
 
         self.densification_interval = 100
@@ -95,6 +96,7 @@ class OptimizationParams(ParamGroup):
         self.densify_from_iter = 500
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
+        
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):

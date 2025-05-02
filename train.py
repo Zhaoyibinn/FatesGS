@@ -12,7 +12,7 @@
 import os
 import torch
 from random import randint
-from utils.loss_utils import l1_loss, ssim, TVLoss, get_depth_ranking_loss
+from utils.loss_utils import l1_loss, ssim, TVLoss, get_depth_ranking_loss,local_pearson_loss,pearson_depth_loss
 from utils.feat_utils import get_feat_loss
 from gaussian_renderer import render, network_gui
 import sys
@@ -24,6 +24,9 @@ from utils.image_utils import psnr
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 from utils.point_utils import depths_to_points
+import matplotlib.pyplot as plt
+
+
 try:
     from torch.utils.tensorboard import SummaryWriter
     TENSORBOARD_FOUND = True
@@ -47,6 +50,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     iter_end = torch.cuda.Event(enable_timing = True)
 
     viewpoint_stack = None
+    viewpoint_stack_diff = None
     ema_loss_for_log = 0.0
     ema_dist_for_log = 0.0
     ema_normal_for_log = 0.0
@@ -65,11 +69,62 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # Pick a random Camera
         if not viewpoint_stack:
             viewpoint_stack = scene.getTrainCameras().copy()
-        viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
+        
+        if not viewpoint_stack_diff:
+            if args.diff:
+                viewpoint_stack_diff = scene.getTrainCameras_diff().copy()
 
+
+        viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
+        # print(viewpoint_cam.image_name)
         render_pkg = render(viewpoint_cam, gaussians, pipe, background)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], \
             render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
+        total_loss_diff = 0
+
+        # if args.diff:
+        if False:
+            viewpoint_cam_diff = viewpoint_stack_diff.pop(randint(0, len(viewpoint_stack_diff)-1))
+            render_pkg_diff = render(viewpoint_cam_diff, gaussians, pipe, background)
+            image_diff, viewspace_point_tensor_diff, visibility_filter_diff, radii_diff = render_pkg_diff["render"], \
+                render_pkg_diff["viewspace_points"], render_pkg_diff["visibility_filter"], render_pkg_diff["radii"]
+            gt_image_diff = viewpoint_cam_diff.original_image.cuda()
+            Ll1_diff = l1_loss(image_diff, gt_image_diff)
+            SSIM_diff = 1.0 - ssim(image_diff, gt_image_diff)
+            # loss_diff = opt.lambda_dssim * SSIM_diff + (1.0 - opt.lambda_dssim) * Ll1_diff
+            loss_diff = opt.lambda_dssim * SSIM_diff 
+
+            lambda_normal = opt.lambda_normal if iteration > 7000 else 0.0
+            lambda_dist = opt.lambda_dist if iteration > 3000 else 0.0
+
+            rend_dist_diff = render_pkg_diff["rend_dist"]
+            rend_normal_diff  = render_pkg_diff['rend_normal']
+            surf_normal_diff = render_pkg_diff['surf_normal']
+            normal_error_diff = (1 - (rend_normal_diff * surf_normal_diff).sum(dim=0))[None]
+            normal_loss_diff = lambda_normal * (normal_error_diff).mean()
+            dist_loss_diff = lambda_dist * (rend_dist_diff).mean()
+
+            surf_depth_diff = render_pkg_diff["surf_depth"]
+            mono_depth_diff = viewpoint_cam_diff.mono_depth
+
+            dsmooth_loss_diff = TVLoss(surf_depth_diff, mono_depth_diff.unsqueeze(0))
+            
+            mask_diff = (surf_depth_diff.view(-1) > 0)
+
+            if args.use_mask:
+                object_mask_diff = viewpoint_cam_diff.gt_alpha_mask > 0.5
+                mask_diff = mask_diff & object_mask_diff.view(-1)
+                depth_rank_loss_diff = get_depth_ranking_loss(surf_depth_diff, mono_depth_diff, object_mask_diff)
+            else:
+                depth_rank_loss_diff = get_depth_ranking_loss(surf_depth_diff, mono_depth_diff, None)
+
+            # Feature loss
+            # surf_points = depths_to_points(viewpoint_cam_diff, surf_depth_diff)
+            # src_viewpoint_stack = scene.getTrainCamerasSource(viewpoint_cam.image_name).copy()
+            # feat_loss = get_feat_loss(surf_points, viewpoint_cam, src_viewpoint_stack, mask, resolution=dataset.resolution)
+        
+            # total_loss_diff = loss_diff + dist_loss_diff + normal_loss_diff + dsmooth_loss_diff + opt.lambda_depth * depth_rank_loss_diff
+            total_loss_diff = loss_diff + dist_loss_diff + normal_loss_diff 
 
         gt_image = viewpoint_cam.original_image.cuda()
         Ll1 = l1_loss(image, gt_image)
@@ -91,6 +146,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         dsmooth_loss = TVLoss(surf_depth, mono_depth.unsqueeze(0))
 
+        pearson_loss = local_pearson_loss(mono_depth,surf_depth.squeeze(0),64,0.5)
+
         mask = (surf_depth.view(-1) > 0)
 
         if args.use_mask:
@@ -106,9 +163,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         feat_loss = get_feat_loss(surf_points, viewpoint_cam, src_viewpoint_stack, mask, resolution=dataset.resolution)
 
         # loss
-        total_loss = loss + dist_loss + normal_loss + dsmooth_loss + \
+        total_loss = loss + dist_loss + normal_loss + dsmooth_loss + opt.lambda_local_pearson * pearson_loss+\
             opt.lambda_feat * feat_loss + \
-            opt.lambda_depth * depth_rank_loss
+            opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff
 
         total_loss.backward()
 
@@ -262,7 +319,7 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
     parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000, 15_000])
-    parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000, 15_000])
+    parser.add_argument("--save_iterations", nargs="+", type=int, default=[1000,3_000, 15_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)

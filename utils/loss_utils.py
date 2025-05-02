@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from math import exp
 import torchvision.transforms as transforms
+import math
 
 transform1 = transforms.CenterCrop((576, 768))
 transform2 = transforms.CenterCrop((544, 736))
@@ -127,3 +128,34 @@ def get_depth_ranking_loss(surf_depth, mono_depth, object_mask=None):
         depth_rank_loss += 0.5 * patched_depth_ranking_loss(surf_depth_crop, mono_depth_crop, patch_size=32)
 
     return depth_rank_loss
+
+def pearson_depth_loss(depth_src, depth_target):
+    #co = pearson(depth_src.reshape(-1), depth_target.reshape(-1))
+
+    src = depth_src - depth_src.mean()
+    target = depth_target - depth_target.mean()
+
+    src = src / (src.std() + 1e-6)
+    target = target / (target.std() + 1e-6)
+
+    co = (src * target).mean()
+    assert not torch.any(torch.isnan(co))
+    return 1 - co
+
+
+def local_pearson_loss(depth_src, depth_target, box_p, p_corr):
+    # Randomly select patch, top left corner of the patch (x_0,y_0) has to be 0 <= x_0 <= max_h, 0 <= y_0 <= max_w
+    num_box_h = math.floor(depth_src.shape[0]/box_p)
+    num_box_w = math.floor(depth_src.shape[1]/box_p)
+    max_h = depth_src.shape[0] - box_p
+    max_w = depth_src.shape[1] - box_p
+    _loss = torch.tensor(0.0,device='cuda')
+    n_corr = int(p_corr * num_box_h * num_box_w)
+    x_0 = torch.randint(0, max_h, size=(n_corr,), device = 'cuda')
+    y_0 = torch.randint(0, max_w, size=(n_corr,), device = 'cuda')
+    x_1 = x_0 + box_p
+    y_1 = y_0 + box_p
+    _loss = torch.tensor(0.0,device='cuda')
+    for i in range(len(x_0)):
+        _loss += pearson_depth_loss(depth_src[x_0[i]:x_1[i],y_0[i]:y_1[i]].reshape(-1), depth_target[x_0[i]:x_1[i],y_0[i]:y_1[i]].reshape(-1))
+    return _loss/n_corr

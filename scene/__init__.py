@@ -18,6 +18,7 @@ from scene.gaussian_model import GaussianModel
 from arguments import ModelParams
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
 
+# real_idx = []
 real_idx = [0,24,48]
 
 class Scene:
@@ -41,6 +42,7 @@ class Scene:
             print("Loading trained model at iteration {}".format(self.loaded_iter))
 
         self.train_cameras = {}
+        self.train_cameras_diff = {}
         self.test_cameras = {}
 
         if os.path.exists(os.path.join(args.source_path, "sparse")):
@@ -68,6 +70,7 @@ class Scene:
         if shuffle:
             random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffling
             random.shuffle(scene_info.test_cameras)  # Multi-res consistent random shuffling
+            random.shuffle(scene_info.train_cameras_diff)  # Multi-res consistent random shuffling
 
         self.cameras_extent = scene_info.nerf_normalization["radius"]
 
@@ -76,6 +79,9 @@ class Scene:
             self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale, args)
             print("Loading Test Cameras")
             self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale, args)
+            if scene_info.train_cameras_diff:
+                print("Loading Diffusion Training Cameras")
+                self.train_cameras_diff[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras_diff, resolution_scale, args)
 
         if self.loaded_iter:
             self.gaussians.load_ply(os.path.join(self.model_path,
@@ -91,6 +97,9 @@ class Scene:
 
     def getTrainCameras(self, scale=1.0):
         return self.train_cameras[scale]
+    
+    def getTrainCameras_diff(self, scale=1.0):
+        return self.train_cameras_diff[scale]
 
     def getTrainCamerasByIdx(self, idx, scale=1.0):
         cameras = self.train_cameras[scale]
@@ -100,7 +109,7 @@ class Scene:
         cameras = self.train_cameras[scale]
         if self.args.diff:
             ref_camera = cameras[real_idx.index(int(cam_img_name))]
-            return cameras
+            return [camera for camera in cameras if int(camera.image_name) in ref_camera.pair]
         else:
             ref_camera = cameras[int(cam_img_name)]
             return [camera for camera in cameras if int(camera.image_name) in ref_camera.pair]

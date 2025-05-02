@@ -7,7 +7,7 @@ def generate_sequence_file(n,file_name):
             left = i - 1
             right = i + 1
             neighbors = []
-            while len(neighbors) < 10:
+            while len(neighbors) < 2:
                 if left >= 0 and left not in neighbors:
                     neighbors.append(left)
                     left -= 1
@@ -28,7 +28,7 @@ def generate_sequence_file(n,file_name):
 
 try:
     
-    generate_sequence_file(49,'/home/zhaoyibin/3DRE/3DGS/FatesGS/DTU/diff/scan24/pair.txt')
+    generate_sequence_file(49,'/home/zhaoyibin/3DRE/3DGS/FatesGS/DTU/diff/scan37/pair.txt')
     print("文件已生成，名为 output.txt")
 except ValueError:
     print("输入无效，请输入一个有效的整数。")
