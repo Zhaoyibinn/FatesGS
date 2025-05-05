@@ -15,3 +15,5 @@ scripts
 *.egg-info
 DTU
 *.pth
+pilianghua_output
+test.xlsx

@@ -62,59 +62,60 @@ def rename_images(folder_path):
         os.rename(old_file_path, new_file_path)
         # print(f"已将 {old_file_path} 重命名为 {new_file_path}")
 
+for idx in [83,97,105,106,110,114,118,122]:
+    
 
+    view_crafter_path = f"DTU/diff/DTU_3/scan{idx}"
+    colmap_path = f"DTU/diff/scan{idx}"
+    colmap_moban_path = "DTU/diff/moban"
+    ori_colmap_path = f"DTU/set_23_24_33/scan{idx}"
+    # check_mkdir(colmap_path)
 
-view_crafter_path = "DTU/diff/DTU_3/scan63"
-colmap_path = "DTU/diff/scan63"
-colmap_moban_path = "DTU/diff/moban"
-ori_colmap_path = "DTU/set_23_24_33/scan63"
-# check_mkdir(colmap_path)
+    copy_folder(colmap_moban_path,colmap_path)
 
-copy_folder(colmap_moban_path,colmap_path)
+    diff_video_path = os.path.join(view_crafter_path,"diffusion.mp4")
+    images_txt_path = os.path.join(view_crafter_path,"images_inter.txt")
+    dust3r_pcd_path = os.path.join(view_crafter_path,"pcd.ply")
 
-diff_video_path = os.path.join(view_crafter_path,"diffusion.mp4")
-images_txt_path = os.path.join(view_crafter_path,"images_inter.txt")
-dust3r_pcd_path = os.path.join(view_crafter_path,"pcd.ply")
+    colmap_images_path = os.path.join(colmap_path,"images")
+    MP42PNG(diff_video_path,colmap_images_path)
+    ori_colmap_images_path = os.path.join(ori_colmap_path,"images")
 
-colmap_images_path = os.path.join(colmap_path,"images")
-MP42PNG(diff_video_path,colmap_images_path)
-ori_colmap_images_path = os.path.join(ori_colmap_path,"images")
+    os.remove(os.path.join(colmap_images_path,"0000.png"))
+    os.remove(os.path.join(colmap_images_path,"0024.png"))
+    os.remove(os.path.join(colmap_images_path,"0025.png"))
+    os.remove(os.path.join(colmap_images_path,"0049.png"))
 
-os.remove(os.path.join(colmap_images_path,"0000.png"))
-os.remove(os.path.join(colmap_images_path,"0024.png"))
-os.remove(os.path.join(colmap_images_path,"0025.png"))
-os.remove(os.path.join(colmap_images_path,"0049.png"))
+    shutil.copy(os.path.join(ori_colmap_images_path,"0000.png"),os.path.join(colmap_images_path,"0000.png"))
+    shutil.copy(os.path.join(ori_colmap_images_path,"0001.png"),os.path.join(colmap_images_path,"0024.png"))
+    shutil.copy(os.path.join(ori_colmap_images_path,"0002.png"),os.path.join(colmap_images_path,"0049.png"))
 
-shutil.copy(os.path.join(ori_colmap_images_path,"0000.png"),os.path.join(colmap_images_path,"0000.png"))
-shutil.copy(os.path.join(ori_colmap_images_path,"0001.png"),os.path.join(colmap_images_path,"0024.png"))
-shutil.copy(os.path.join(ori_colmap_images_path,"0002.png"),os.path.join(colmap_images_path,"0049.png"))
+    rename_images(colmap_images_path)
+    print("图片复制并操作完成")
 
-rename_images(colmap_images_path)
-print("图片复制并操作完成")
+    shutil.copy(images_txt_path,os.path.join(colmap_path,"sparse","model","images.txt"))
+    print("colmap位姿复制完成")
 
-shutil.copy(images_txt_path,os.path.join(colmap_path,"sparse","model","images.txt"))
-print("colmap位姿复制完成")
+    os.chdir(colmap_path)
+    if os.path.exists("database.db"):
+        os.remove("database.db")
+    os.system("bash colmap.bash")
+    print("colmap稀疏重建完成")
+    os.chdir("../../..")
 
-os.chdir(colmap_path)
-if os.path.exists("database.db"):
-    os.remove("database.db")
-os.system("bash colmap.bash")
-print("colmap稀疏重建完成")
-os.chdir("../../..")
+    shutil.copy(dust3r_pcd_path,os.path.join(colmap_path,"sparse","0","points3D.ply"))
+    print("pcd复制完成")
 
-shutil.copy(dust3r_pcd_path,os.path.join(colmap_path,"sparse","0","points3D.ply"))
-print("pcd复制完成")
+    current_path = os.getcwd()
+    current_colmap_path=os.path.join(current_path,colmap_path)
+    current_colmap_images_path=os.path.join(current_colmap_path,"images")
+    current_colmap_depth_path=os.path.join(current_colmap_path,"depth_npy_all")
 
-current_path = os.getcwd()
-current_colmap_path=os.path.join(current_path,colmap_path)
-current_colmap_images_path=os.path.join(current_colmap_path,"images")
-current_colmap_depth_path=os.path.join(current_colmap_path,"depth_npy_all")
+    os.chdir("/home/zhaoyibin/3DRE/Marigold")
+    py_path = "/home/zhaoyibin/anaconda3/envs/fatesgs/bin/python"
+    check_mkdir(current_colmap_depth_path)
+    os.system(f"{py_path} run.py --input_rgb_dir {current_colmap_images_path} --output_dir {current_colmap_depth_path}")
+    os.chdir(current_path)
 
-os.chdir("/home/zhaoyibin/3DRE/Marigold")
-py_path = "/home/zhaoyibin/anaconda3/envs/fatesgs/bin/python"
-check_mkdir(current_colmap_depth_path)
-os.system(f"{py_path} run.py --input_rgb_dir {current_colmap_images_path} --output_dir {current_colmap_depth_path}")
-os.chdir(current_path)
-
-copy_folder(os.path.join(colmap_path,"depth_npy_all","depth_npy"),os.path.join(colmap_path,"depth_npy"))
+    copy_folder(os.path.join(colmap_path,"depth_npy_all","depth_npy"),os.path.join(colmap_path,"depth_npy"))
 

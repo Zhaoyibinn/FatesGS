@@ -56,6 +56,7 @@ class ModelParams(ParamGroup):
         self.eval = False
         self.use_mask = False
         self._diff = False
+        self.origin_data = False
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):
@@ -96,6 +97,16 @@ class OptimizationParams(ParamGroup):
         self.densify_from_iter = 500
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
+
+        self.origin_train = False
+
+        self.lambda_diff_l1 = 0.0
+        self.lambda_diff_ssim = 0.2
+        self.lambda_diff_rend_dist = 0.0
+        self.lambda_diff_normal = 0.0
+        self.lambda_diff_dsmooth = 0.0
+        self.lambda_diff_depth = 0.0
+
         
         super().__init__(parser, "Optimization Parameters")
 

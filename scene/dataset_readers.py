@@ -456,7 +456,11 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
     if eval:
         ply_path = os.path.join(path, "pixelnerf/dense/fused.ply")
     else:
-        ply_path = os.path.join(path, "sparse/0/points3D.ply")
+        if args.origin_data:
+            ply_path = os.path.join(path, "sparse/0/points3D_colmap.ply")
+            print("直接采用colmap的结果而非其他初始化")
+        else:
+            ply_path = os.path.join(path, "sparse/0/points3D.ply")
 
     if not os.path.exists(ply_path):
         print("Converting point3d.bin to .ply, will happen only the first time you open the scene.")

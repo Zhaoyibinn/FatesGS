@@ -8,7 +8,7 @@
 #
 # For inquiries contact  george.drettakis@inria.fr
 #
-
+import swanlab
 import os
 import torch
 from random import randint
@@ -25,6 +25,8 @@ from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 from utils.point_utils import depths_to_points
 import matplotlib.pyplot as plt
+import json
+
 
 
 try:
@@ -34,9 +36,34 @@ except ImportError:
     TENSORBOARD_FOUND = False
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint):
+    train_config = {
+        "lambda_diff_l1": opt.lambda_diff_l1,
+        "lambda_diff_ssim": opt.lambda_diff_ssim,
+        "lambda_diff_rend_dist": opt.lambda_diff_rend_dist,
+        "lambda_diff_normal": opt.lambda_diff_normal,
+        "lambda_diff_dsmooth": opt.lambda_diff_dsmooth,
+        "lambda_diff_depth": opt.lambda_diff_depth,
+        "lambda_local_pearson": opt.lambda_local_pearson,
+        "origin_fatesgs":opt.origin_train,
+    }
+
+    config_save_path = os.path.join(dataset.model_path,"train_conf.json")
+
+
+    swanlab.init(
+    # 设置项目名
+    project="Diff_FatesGS_train",
+    # 设置超参数
+    config=train_config,
+    experiment_name=dataset.source_path.split("/")[-1]
+    )
+
+
+
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
+    dataset.origin_data = opt.origin_train
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
@@ -57,6 +84,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
+    with open(config_save_path, 'w') as f:
+        json.dump(train_config, f)
     for iteration in range(first_iter, opt.iterations + 1):
         iter_start.record()
 
@@ -82,8 +111,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         total_loss_diff = 0
 
-        # if args.diff:
-        if False:
+        if args.diff and not args.origin_train:
+        # if False:
             viewpoint_cam_diff = viewpoint_stack_diff.pop(randint(0, len(viewpoint_stack_diff)-1))
             render_pkg_diff = render(viewpoint_cam_diff, gaussians, pipe, background)
             image_diff, viewspace_point_tensor_diff, visibility_filter_diff, radii_diff = render_pkg_diff["render"], \
@@ -124,8 +153,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # feat_loss = get_feat_loss(surf_points, viewpoint_cam, src_viewpoint_stack, mask, resolution=dataset.resolution)
         
             # total_loss_diff = loss_diff + dist_loss_diff + normal_loss_diff + dsmooth_loss_diff + opt.lambda_depth * depth_rank_loss_diff
-            total_loss_diff = loss_diff + dist_loss_diff + normal_loss_diff 
-
+            total_loss_diff = opt.lambda_diff_l1*Ll1_diff+opt.lambda_diff_ssim *SSIM_diff + opt.lambda_diff_rend_dist * dist_loss_diff + opt.lambda_diff_normal * normal_loss_diff + opt.lambda_diff_dsmooth * dsmooth_loss_diff + opt.lambda_diff_depth * depth_rank_loss_diff
+            # print(opt.lambda_diff_l1,opt.lambda_diff_ssim)
         gt_image = viewpoint_cam.original_image.cuda()
         Ll1 = l1_loss(image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
@@ -146,7 +175,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         dsmooth_loss = TVLoss(surf_depth, mono_depth.unsqueeze(0))
 
-        pearson_loss = local_pearson_loss(mono_depth,surf_depth.squeeze(0),64,0.5)
+        if opt.lambda_local_pearson !=0:
+            pearson_loss = local_pearson_loss(mono_depth,surf_depth.squeeze(0),64,0.5)
+        else:
+            pearson_loss = 0
 
         mask = (surf_depth.view(-1) > 0)
 
@@ -197,6 +229,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 tb_writer.add_scalar('train_loss_patches/normal_loss', ema_normal_for_log, iteration)
 
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
+            
+            if iteration%100 == 0:
+                swanlab.log({"L1_loss": Ll1})
+            
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)

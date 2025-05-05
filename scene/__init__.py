@@ -15,7 +15,7 @@ import json
 from utils.system_utils import searchForMaxIteration
 from scene.dataset_readers import sceneLoadTypeCallbacks
 from scene.gaussian_model import GaussianModel
-from arguments import ModelParams
+from arguments import ModelParams,OptimizationParams
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
 
 # real_idx = []
@@ -32,7 +32,10 @@ class Scene:
         self.model_path = args.model_path
         self.loaded_iter = None
         self.gaussians = gaussians
+        
         self.args = args
+        
+
 
         if load_iteration:
             if load_iteration == -1:
