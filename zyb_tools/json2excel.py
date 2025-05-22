@@ -5,10 +5,11 @@ import os
 def custom_sort_key(x):
     return int(x[3:]) 
 
+allsense = [24 ,37, 40, 55,63, 65 ,69 ,83 ,97 ,105 ,106 ,110 ,114 ,118 ,122]
 excel_file = "test.xlsx"
-root_path = "pilianghua_output/origin"
-main_columns = ["origin", "ssimdiff","alllossdiff", "ssimdiff_manyrender","ssimdiff_person"]
-# main_columns = ["origin", "ssimdiff"]
+# root_path = "pilianghua_output2/origin"
+# main_columns = ["origin", "ssim_l1_diff","ssim_l1_normal_dist_diff","ssimdiff","alllossdiff", "ssimdiff_manyrender"]
+main_columns = ["origin", "ssimdiff","ssim_l1_normal_dist_diff","ssimdiff_manyrender","nodust3r","nofates","nofeat","nodepth"]
 
 
 
@@ -20,8 +21,8 @@ all_all_data = []
 for i in main_columns:
     all_data = []
     root_path = os.path.join("pilianghua_output",i)
-    for sense in sorted(os.listdir(root_path), key=custom_sort_key):
-        
+    for sense_idx in allsense:
+        sense = "dtu"+str(sense_idx)
         json_file = os.path.join(root_path,sense,"results.json")
         # "pilianghua_output/origin/dtu37/results.json"
         
@@ -30,14 +31,15 @@ for i in main_columns:
         try:
             with open(json_file, 'r') as file:
                 data = json.load(file)
+                for item in [data]:
+                    data_1.update(item)
+                del data_1["mean_d2s"]
+                del data_1["mean_s2d"]
         except:
             data = []
         # data = json.load(json_file)
         # data["data"] = json_file.split("/")[-2]
-        for item in [data]:
-            data_1.update(item)
-        del data_1["mean_d2s"]
-        del data_1["mean_s2d"]
+
         all_data.append(data_1)
     all_data_df = pd.DataFrame(all_data)
     all_data_df.columns = pd.MultiIndex.from_product([[i], all_data_df.columns])

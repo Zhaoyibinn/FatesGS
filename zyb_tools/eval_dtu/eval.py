@@ -40,19 +40,24 @@ if __name__ == '__main__':
     parser.add_argument('--max_dist', type=float, default=20)
     parser.add_argument('--visualize_threshold', type=float, default=10)
     args = parser.parse_args()
-
-    train_conf_path = args.data.replace("culled_mesh.ply","train_conf.json")
-    with open(train_conf_path, 'r', encoding='utf-8') as file:
-        train_conf = json.load(file)
-    # print(train_conf)
-
-    swanlab.init(
+    try:
+        train_conf_path = args.data.replace("culled_mesh.ply","train_conf.json")
+        with open(train_conf_path, 'r', encoding='utf-8') as file:
+            train_conf = json.load(file)
+        swanlab.init(
         # 设置项目名
-        project="Diff_FatesGS_train",
+        project="Diff_FatesGS_eval",
         # 设置超参数
         config=train_conf,
         experiment_name="scan"+str(args.scan)
         )
+        record = True
+    except:
+        print("no conf not fatesgs")
+        record = False
+    # print(train_conf)
+
+   
 
 
     thresh = args.downsample_density
@@ -136,7 +141,8 @@ if __name__ == '__main__':
     dist_d2s, idx_d2s = nn_engine.kneighbors(data_in_obs, n_neighbors=1, return_distance=True)
     max_dist = args.max_dist
     mean_d2s = dist_d2s[dist_d2s < max_dist].mean()
-    swanlab.log({"data2stl": mean_d2s})
+    if record:
+        swanlab.log({"data2stl": mean_d2s})
 
     pbar.update(1)
     pbar.set_description('compute stl2data')
@@ -149,7 +155,8 @@ if __name__ == '__main__':
     nn_engine.fit(data_in)
     dist_s2d, idx_s2d = nn_engine.kneighbors(stl_above, n_neighbors=1, return_distance=True)
     mean_s2d = dist_s2d[dist_s2d < max_dist].mean()
-    swanlab.log({"stl2data": mean_s2d})
+    if record:
+        swanlab.log({"stl2data": mean_s2d})
 
     pbar.update(1)
     pbar.set_description('visualize error')
@@ -174,7 +181,8 @@ if __name__ == '__main__':
     pbar.close()
     over_all = (mean_d2s + mean_s2d) / 2
     print(mean_d2s, mean_s2d, over_all)
-    swanlab.log({"over_all": over_all})
+    if record:
+        swanlab.log({"over_all": over_all})
     
     import json
     with open(f'{args.vis_out_dir}/results.json', 'w') as fp:

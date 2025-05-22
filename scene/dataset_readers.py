@@ -456,7 +456,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
     if eval:
         ply_path = os.path.join(path, "pixelnerf/dense/fused.ply")
     else:
-        if args.origin_data:
+        if args.origin_data or args.no_dust:
             ply_path = os.path.join(path, "sparse/0/points3D_colmap.ply")
             print("直接采用colmap的结果而非其他初始化")
         else:

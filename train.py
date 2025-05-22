@@ -49,14 +49,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     config_save_path = os.path.join(dataset.model_path,"train_conf.json")
 
-
-    swanlab.init(
-    # 设置项目名
-    project="Diff_FatesGS_train",
-    # 设置超参数
-    config=train_config,
-    experiment_name=dataset.source_path.split("/")[-1]
-    )
+    if not opt.not_record:
+        swanlab.init(
+        # 设置项目名
+        project="Diff_FatesGS_train",
+        # 设置超参数
+        config=train_config,
+        experiment_name=dataset.source_path.split("/")[-1]
+        )
 
 
 
@@ -64,6 +64,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
     dataset.origin_data = opt.origin_train
+    dataset.no_dust = opt.no_dust3r
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
@@ -176,7 +177,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         dsmooth_loss = TVLoss(surf_depth, mono_depth.unsqueeze(0))
 
         if opt.lambda_local_pearson !=0:
-            pearson_loss = local_pearson_loss(mono_depth,surf_depth.squeeze(0),64,0.5)
+            Local_pearson_loss = local_pearson_loss(mono_depth,surf_depth.squeeze(0),64,0.5)
+        else:
+            Local_pearson_loss = 0
+
+        if opt.lambda_pearson !=0:
+            pearson_loss = pearson_depth_loss(mono_depth,surf_depth.squeeze(0))
         else:
             pearson_loss = 0
 
@@ -195,7 +201,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         feat_loss = get_feat_loss(surf_points, viewpoint_cam, src_viewpoint_stack, mask, resolution=dataset.resolution)
 
         # loss
-        total_loss = loss + dist_loss + normal_loss + dsmooth_loss + opt.lambda_local_pearson * pearson_loss+\
+        total_loss = loss + dist_loss + normal_loss + dsmooth_loss + opt.lambda_local_pearson * Local_pearson_loss+ opt.lambda_pearson * pearson_loss + \
             opt.lambda_feat * feat_loss + \
             opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff
 
@@ -230,7 +236,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
             
-            if iteration%100 == 0:
+            if iteration%100 == 0 and not opt.not_record:
                 swanlab.log({"L1_loss": Ll1})
             
             if (iteration in saving_iterations):
@@ -372,7 +378,7 @@ if __name__ == "__main__":
     safe_state(args.quiet)
 
     # Start GUI server, configure and run training
-    network_gui.init(args.ip, args.port)
+    # network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
     training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint)
 

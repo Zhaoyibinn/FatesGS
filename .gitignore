@@ -17,3 +17,6 @@ DTU
 *.pth
 pilianghua_output
 test.xlsx
+BMVS_colmap
+pilianghua_output2
+BMVS_OUT

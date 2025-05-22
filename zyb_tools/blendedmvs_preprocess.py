@@ -37,7 +37,7 @@ def MP42PNG(video_path,images_dir):
                 # 生成存储帧的文件名
                 frame_filename = os.path.join(images_dir, f'{frame_count:04d}.png')
                 # 保存帧为图像文件
-                frame = cv2.resize(frame, (1554, 1162), interpolation=cv2.INTER_CUBIC)
+                frame = cv2.resize(frame, (768, 576), interpolation=cv2.INTER_CUBIC)
                 cv2.imwrite(frame_filename, frame)
                 frame_count += 1
             else:
@@ -63,12 +63,12 @@ def rename_images(folder_path):
         # print(f"已将 {old_file_path} 重命名为 {new_file_path}")
 
 # for idx in [24 ,37, 40, 63, 65 ,69 ,83 ,97 ,105 ,106 ,110 ,114 ,118 ,122]:
-for idx in [63,110 ,114 ,118 ,122]:
+for idx in ["5947b62af1b45630bd0c2a02"]:
 
-    view_crafter_path = f"DTU/diff/DTU_3_2/scan{idx}"
-    colmap_path = f"DTU/diff/scan{idx}"
-    colmap_moban_path = "DTU/diff/moban"
-    ori_colmap_path = f"DTU/set_22_25_28/scan{idx}"
+    view_crafter_path = f"BMVS_colmap/diff/diff_video/{idx}"
+    colmap_path = f"BMVS_colmap/diff/{idx}"
+    colmap_moban_path = "BMVS_colmap/diff/moban"
+    ori_colmap_path = f"BMVS_colmap/diff_origin/{idx}"
     # check_mkdir(colmap_path)
 
     copy_folder(colmap_moban_path,colmap_path)

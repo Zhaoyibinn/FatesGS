@@ -6,8 +6,11 @@ ours_depth_dir = "DTU/diff"
 
 
 for scan in os.listdir(guanfang_depth_dir):
+    
     if not scan in os.listdir(ours_depth_dir):
+        print(scan,"continue")
         continue
+    
     guanfang_dir = os.path.join(guanfang_depth_dir,scan)
     ours_dir= os.path.join(ours_depth_dir,scan)
 
