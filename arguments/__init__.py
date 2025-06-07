@@ -112,7 +112,11 @@ class OptimizationParams(ParamGroup):
         self.lambda_pearson = 0.00
         self.no_dust3r = False
 
-        self.not_record = False
+        self.not_record = True
+
+        self.drop = False
+
+        self.lambda_normal_est = 0.1
 
         super().__init__(parser, "Optimization Parameters")
 

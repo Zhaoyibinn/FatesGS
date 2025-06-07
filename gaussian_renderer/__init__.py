@@ -16,7 +16,7 @@ from scene.gaussian_model import GaussianModel
 from utils.sh_utils import eval_sh
 from utils.point_utils import depth_to_normal
 
-def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
+def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None,drop=False,iteration=None):
     """
     Render the scene.
 
@@ -88,6 +88,19 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
         means3D.retain_grad()
     except:
         pass
+
+    if drop:
+        # Create initial compensation factor (1 for each Gaussian)
+        compensation = torch.ones(opacity.shape[0], dtype=torch.float32, device="cuda")
+
+        # Apply DropGaussian with compensation
+        drop_rate = 0.2 * (iteration/7500)
+        # print(f"dropping{drop_rate}")
+        d = torch.nn.Dropout(p=drop_rate)
+        compensation = d(compensation)
+
+        # Apply to opacity
+        opacity = opacity * compensation[:, None]
 
     rendered_image, radii, allmap = rasterizer(
         means3D = means3D,

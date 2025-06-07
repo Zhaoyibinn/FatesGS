@@ -49,14 +49,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     config_save_path = os.path.join(dataset.model_path,"train_conf.json")
 
-    if not opt.not_record:
-        swanlab.init(
-        # 设置项目名
-        project="Diff_FatesGS_train",
-        # 设置超参数
-        config=train_config,
-        experiment_name=dataset.source_path.split("/")[-1]
-        )
+    # if not opt.not_record:
+    #     swanlab.init(
+    #     # 设置项目名
+    #     project="Diff_FatesGS_train",
+    #     # 设置超参数
+    #     config=train_config,
+    #     experiment_name=dataset.source_path.split("/")[-1]
+    #     )
 
 
 
@@ -65,6 +65,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     gaussians = GaussianModel(dataset.sh_degree)
     dataset.origin_data = opt.origin_train
     dataset.no_dust = opt.no_dust3r
+    # dataset.normals_est = opt.normals_est
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
@@ -104,10 +105,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if args.diff:
                 viewpoint_stack_diff = scene.getTrainCameras_diff().copy()
 
-
+        
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
         # print(viewpoint_cam.image_name)
-        render_pkg = render(viewpoint_cam, gaussians, pipe, background)
+        render_pkg = render(viewpoint_cam, gaussians, pipe, background,drop=opt.drop,iteration=iteration)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], \
             render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         total_loss_diff = 0
@@ -130,6 +131,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             rend_dist_diff = render_pkg_diff["rend_dist"]
             rend_normal_diff  = render_pkg_diff['rend_normal']
             surf_normal_diff = render_pkg_diff['surf_normal']
+
+
             normal_error_diff = (1 - (rend_normal_diff * surf_normal_diff).sum(dim=0))[None]
             normal_loss_diff = lambda_normal * (normal_error_diff).mean()
             dist_loss_diff = lambda_dist * (rend_dist_diff).mean()
@@ -167,6 +170,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         rend_dist = render_pkg["rend_dist"]
         rend_normal  = render_pkg['rend_normal']
         surf_normal = render_pkg['surf_normal']
+
+        if opt.lambda_normal_est!=0:
+            est_normal_loss =(1 - ( rend_normal * torch.tensor(viewpoint_cam.normal).cuda()).sum(dim=0))[None].mean()
+        else:
+            est_normal_loss = 0
+
         normal_error = (1 - (rend_normal * surf_normal).sum(dim=0))[None]
         normal_loss = lambda_normal * (normal_error).mean()
         dist_loss = lambda_dist * (rend_dist).mean()
@@ -203,7 +212,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # loss
         total_loss = loss + dist_loss + normal_loss + dsmooth_loss + opt.lambda_local_pearson * Local_pearson_loss+ opt.lambda_pearson * pearson_loss + \
             opt.lambda_feat * feat_loss + \
-            opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff
+            opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff + opt.lambda_normal_est * est_normal_loss
 
         total_loss.backward()
 
@@ -233,11 +242,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if tb_writer is not None:
                 tb_writer.add_scalar('train_loss_patches/dist_loss', ema_dist_for_log, iteration)
                 tb_writer.add_scalar('train_loss_patches/normal_loss', ema_normal_for_log, iteration)
+                tb_writer.add_scalar('train_loss_patches/est_normal_loss', est_normal_loss, iteration)
 
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
             
-            if iteration%100 == 0 and not opt.not_record:
-                swanlab.log({"L1_loss": Ll1})
+            # if iteration%100 == 0 and not opt.not_record:
+            #     swanlab.log({"L1_loss": Ll1})
             
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
@@ -360,7 +370,7 @@ if __name__ == "__main__":
     parser.add_argument('--ip', type=str, default="127.0.0.1")
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000, 15_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[3000,5000,10000, 15_000])
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[1000,3_000, 15_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])

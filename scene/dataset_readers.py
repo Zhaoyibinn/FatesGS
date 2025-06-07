@@ -25,7 +25,7 @@ from scene.gaussian_model import BasicPointCloud
 import torch
 from utils.feat_utils import FeatExt, load_pair
 from utils.general_utils import PILtoTorch
-
+import cv2
 
 # real_idx = []
 real_idx = [0,24,48]
@@ -44,6 +44,7 @@ class CameraInfo(NamedTuple):
     feat: list = None
     pair: list = None
     mono_depth: np.array = None
+    normal: np.array = None
     mask: np.array = None
 
 class SceneInfo(NamedTuple):
@@ -84,6 +85,7 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
     
     depths_folder = os.path.join(path, "depth_npy")
     masks_folder = os.path.join(path, "mask")
+    normals_folder = os.path.join(path, "normals")
 
     from glob import glob
     def glob_imgs(path):
@@ -189,9 +191,15 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
         depth = None
         # 这边除了常规的还增加了深度图
 
+        normal_path = os.path.join(normals_folder, image_name + ".png")
+        normal = None
+
         if os.path.exists(depth_path):
             depth = np.load(depth_path)
-
+        if os.path.exists(normal_path):
+            normal = cv2.imread(normal_path,cv2.IMREAD_UNCHANGED)
+            normal = cv2.resize(normal,(normal.shape[1]//scale,normal.shape[0]//scale))
+            normal = ((normal.transpose((2, 0, 1))) / 255) * 2 - 1
         mask = None
         if read_mask:
             mask_path = os.path.join(masks_folder, "{:0>3}.png".format(int(image_name)))
@@ -208,12 +216,12 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
             cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                               image_path=image_path, image_name=image_name, width=width, height=height,
                               feat=[feats[real_idx.index(int(image_name))] for feats in feats_list],
-                              pair=[int(idx) for idx in pair], mono_depth=depth, mask=mask)
+                              pair=[int(idx) for idx in pair], mono_depth=depth, normal = normal,mask=mask)
         else:
             cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                                 image_path=image_path, image_name=image_name, width=width, height=height,
                                 feat=[feats[int(image_name)] for feats in feats_list],
-                                pair=[int(idx) for idx in pair], mono_depth=depth, mask=mask)
+                                pair=[int(idx) for idx in pair], mono_depth=depth,normal = normal, mask=mask)
         # cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
         #                       image_path=image_path, image_name=image_name, width=width, height=height,
         #                       feat=[feats[int(image_name)] for feats in feats_list], mono_depth=depth, mask=mask)

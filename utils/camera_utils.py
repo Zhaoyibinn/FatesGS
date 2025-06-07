@@ -95,7 +95,7 @@ def loadCam(args, id, cam_info, resolution_scale):
                   FoVx=cam_info.FovX, FoVy=cam_info.FovY,
                   image=gt_image, gt_alpha_mask=loaded_mask,
                   image_name=cam_info.image_name, uid=id,
-                  feats=cam_info.feat, mono_depth=mono_depth, pair=cam_info.pair,
+                  feats=cam_info.feat, mono_depth=mono_depth, normal = cam_info.normal , pair=cam_info.pair,
                   use_mask=args.use_mask, data_device=args.data_device)
 
 def cameraList_from_camInfos(cam_infos, resolution_scale, args):
