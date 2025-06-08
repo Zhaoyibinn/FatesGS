@@ -198,7 +198,8 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
             depth = np.load(depth_path)
         if os.path.exists(normal_path):
             normal = cv2.imread(normal_path,cv2.IMREAD_UNCHANGED)
-            normal = cv2.resize(normal,(normal.shape[1]//scale,normal.shape[0]//scale))
+            normal = cv2.resize(normal,(normal.shape[1],normal.shape[0]))
+            normal = normal[:, :, [2, 0, 1]]
             normal = ((normal.transpose((2, 0, 1))) / 255) * 2 - 1
         mask = None
         if read_mask:

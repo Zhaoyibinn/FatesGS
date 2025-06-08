@@ -26,6 +26,10 @@ from arguments import ModelParams, PipelineParams, OptimizationParams
 from utils.point_utils import depths_to_points
 import matplotlib.pyplot as plt
 import json
+import torch.nn.functional as F
+from fused_ssim import fused_ssim
+
+from extra_model.lowpass_pt import create_lowpass_filter,apply_lowpass_filter
 
 
 
@@ -34,6 +38,20 @@ try:
     TENSORBOARD_FOUND = True
 except ImportError:
     TENSORBOARD_FOUND = False
+
+
+def ranking_loss(error, penalize_ratio=0.7, extra_weights=None , type='mean'):
+    error, indices = torch.sort(error)
+    # only sum relatively small errors
+    s_error = torch.index_select(error, 0, index=indices[:int(penalize_ratio * indices.shape[0])])
+    if extra_weights is not None:
+        weights = torch.index_select(extra_weights, 0, index=indices[:int(penalize_ratio * indices.shape[0])])
+        s_error = s_error * weights
+
+    if type == 'mean':
+        return torch.mean(s_error)
+    elif type == 'sum':
+        return torch.sum(s_error)
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint):
     train_config = {
@@ -120,8 +138,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             image_diff, viewspace_point_tensor_diff, visibility_filter_diff, radii_diff = render_pkg_diff["render"], \
                 render_pkg_diff["viewspace_points"], render_pkg_diff["visibility_filter"], render_pkg_diff["radii"]
             gt_image_diff = viewpoint_cam_diff.original_image.cuda()
-            Ll1_diff = l1_loss(image_diff, gt_image_diff)
-            SSIM_diff = 1.0 - ssim(image_diff, gt_image_diff)
+            
+
+            filter_tensor = create_lowpass_filter((image_diff.shape[1], image_diff.shape[2]), cutoff=0.6, device="cuda")
+            
+            low_pass_image_diff = apply_lowpass_filter(image_diff.unsqueeze(0), filter_tensor).squeeze()
+            low_pass_gt_image_diff = apply_lowpass_filter(gt_image_diff.unsqueeze(0), filter_tensor).squeeze()
+            
+            # Ll1_diff = l1_loss(image_diff, gt_image_diff)
+            # SSIM_diff = 1.0 - ssim(image_diff, gt_image_diff)
+            Ll1_diff = l1_loss(low_pass_image_diff, low_pass_gt_image_diff)
+            SSIM_diff = 1.0 - fused_ssim(low_pass_image_diff.unsqueeze(0), low_pass_gt_image_diff.unsqueeze(0))
+
             # loss_diff = opt.lambda_dssim * SSIM_diff + (1.0 - opt.lambda_dssim) * Ll1_diff
             loss_diff = opt.lambda_dssim * SSIM_diff 
 
@@ -161,7 +189,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # print(opt.lambda_diff_l1,opt.lambda_diff_ssim)
         gt_image = viewpoint_cam.original_image.cuda()
         Ll1 = l1_loss(image, gt_image)
-        loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+        loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - fused_ssim(image.unsqueeze(0), gt_image.unsqueeze(0)))
 
         # regularization
         lambda_normal = opt.lambda_normal if iteration > 7000 else 0.0
@@ -172,10 +200,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         surf_normal = render_pkg['surf_normal']
 
         if opt.lambda_normal_est!=0:
-            est_normal_loss =(1 - ( rend_normal * torch.tensor(viewpoint_cam.normal).cuda()).sum(dim=0))[None].mean()
+            # est_normal_loss =(1 - ( rend_normal * torch.tensor(viewpoint_cam.normal).cuda()).sum(dim=0))[None].mean()
+            est_normal_loss = (1 - F.cosine_similarity(torch.tensor(viewpoint_cam.normal).cuda(), rend_normal, dim=0))
+            est_normal_loss = ranking_loss(est_normal_loss.flatten(), penalize_ratio=1.0, type='mean')
         else:
             est_normal_loss = 0
 
+
+        
         normal_error = (1 - (rend_normal * surf_normal).sum(dim=0))[None]
         normal_loss = lambda_normal * (normal_error).mean()
         dist_loss = lambda_dist * (rend_dist).mean()
@@ -261,7 +293,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
-                    gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold)
+                    # gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold)
+                    gaussians.prune_large_and_transparent(0.005, 10.0)
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()

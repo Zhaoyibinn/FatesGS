@@ -403,3 +403,17 @@ class GaussianModel:
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter], dim=-1, keepdim=True)
         self.denom[update_filter] += 1
+
+    def prune_large_and_transparent(self, min_opacity, extent):
+        
+        #torch.cuda.empty_cache()
+        # grads = self.xyz_gradient_accum / self.denom
+        # grads[grads.isnan()] = 0.0
+        # plt.hist(self.get_scaling.max(dim=1).values.detach().cpu().numpy()) # , bins=np.arange(0.,1.0,0.005)
+        # plt.show()
+        prune_mask = (self.get_opacity < min_opacity).squeeze()
+        
+        if extent != None:
+            big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
+            prune_mask = torch.logical_or(prune_mask, big_points_ws)
+        self.prune_points(prune_mask)
