@@ -1,0 +1,3 @@
+[submodule "submodules/diff-surfel-rasterization-MCMC"]
+	path = submodules/diff-surfel-rasterization-MCMC
+	url = https://github.com/hwanhuh/diff-surfel-rasterization-MCMC.git
