@@ -52,6 +52,56 @@ def ranking_loss(error, penalize_ratio=0.7, extra_weights=None , type='mean'):
         return torch.mean(s_error)
     elif type == 'sum':
         return torch.sum(s_error)
+    
+def prune_low_contribution_gaussians(gaussians, cameras, pipe, bg, K=5, prune_ratio=0.1):
+    top_list = [None, ] * K
+    for i, cam in enumerate(cameras):
+        trans = render(cam, gaussians, pipe, bg, record_transmittance=True)
+        if top_list[0] is not None:
+            m = trans > top_list[0]
+            if m.any(): #如果有任何一个比之前大的贡献
+                for i in range(K - 1):
+                    top_list[K - 1 - i][m] = top_list[K - 2 - i][m]
+                top_list[0][m] = trans[m]
+        else:
+            top_list = [trans.clone() for _ in range(K)]
+            # 第一轮复制五个一样的trans
+    # 其实就是记录了每个点的在不同相机中的最大贡献度，并且从大到小排（属于哪个相机不重要）
+
+    contribution = torch.stack(top_list, dim=-1).mean(-1)
+    tile = torch.quantile(contribution, prune_ratio)
+    prune_mask = contribution < tile
+    gaussians.prune_points(prune_mask)
+    torch.cuda.empty_cache()
+
+def culling(xyz, cams, expansion=2):
+    cam_centers = torch.stack([c.camera_center for c in cams], 0).to(xyz.device)
+    span_x = cam_centers[:, 0].max() - cam_centers[:, 0].min()
+    span_y = cam_centers[:, 1].max() - cam_centers[:, 1].min() # smallest span
+    span_z = cam_centers[:, 2].max() - cam_centers[:, 2].min()
+
+    scene_center = cam_centers.mean(0)
+
+    span_x = span_x * expansion
+    span_y = span_y * expansion
+    span_z = span_z * expansion
+
+    x_min = scene_center[0] - span_x / 2
+    x_max = scene_center[0] + span_x / 2
+
+    y_min = scene_center[1] - span_y / 2
+    y_max = scene_center[1] + span_y / 2
+
+    z_min = scene_center[2] - span_x / 2
+    z_max = scene_center[2] + span_x / 2
+
+
+    valid_mask = (xyz[:, 0] > x_min) & (xyz[:, 0] < x_max) & \
+                 (xyz[:, 1] > y_min) & (xyz[:, 1] < y_max) & \
+                 (xyz[:, 2] > z_min) & (xyz[:, 2] < z_max)
+    # print(f'scene mask ratio {valid_mask.sum().item() / valid_mask.shape[0]}')
+
+    return valid_mask, scene_center
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint):
     train_config = {
@@ -104,8 +154,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
+    print(f"检测到原本训练视角 {len(scene.getTrainCameras())}")
     with open(config_save_path, 'w') as f:
         json.dump(train_config, f)
+    all_cameras = scene.getTrainCameras().copy()
     for iteration in range(first_iter, opt.iterations + 1):
         iter_start.record()
 
@@ -293,8 +345,32 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
+                    if opt.split == "ordinary":
+                        gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, max_screen_size=opt.max_screen_size)
+
+                    elif opt.split == "scale":
+                        scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
+                        gaussians.densify_and_scale_split(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, opt.max_screen_size, opt.densify_scale_factor, scene_mask, N=3, no_grad=True)
+
+                    elif opt.split == "mix":
+                        grads = gaussians.xyz_gradient_accum / gaussians.denom
+                        grads[grads.isnan()] = 0.0
+                        gaussians.densify_and_clone(grads, opt.densify_grad_threshold, scene.cameras_extent)
+                        gaussians.densify_and_split(grads, opt.densify_grad_threshold, scene.cameras_extent)
+                        scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
+                        gaussians.densify_and_scale_split(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, opt.max_screen_size, opt.densify_scale_factor, scene_mask, N=3, no_grad=True)
+
+
+
+
                     # gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold)
-                    gaussians.prune_large_and_transparent(0.005, 10.0)
+
+                    # gaussians.prune_large_and_transparent(0.005, 10.0)
+
+                    # TrimGS
+                    # if iteration > opt.contribution_prune_from_iter and iteration % opt.contribution_prune_interval == 0:
+                    #     prune_low_contribution_gaussians(gaussians, all_cameras, pipe, background, K=5, prune_ratio=opt.contribution_prune_ratio)
+                    #     print(f'Num gs after contribution prune: {len(gaussians.get_xyz)}')
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()

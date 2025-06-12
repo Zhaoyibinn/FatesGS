@@ -116,7 +116,15 @@ class OptimizationParams(ParamGroup):
 
         self.drop = False
 
-        self.lambda_normal_est = 0.1
+        self.lambda_normal_est = 0.0
+
+        self.contribution_prune_from_iter = 500
+        self.contribution_prune_interval = 3000
+        self.contribution_prune_ratio = 0.1
+        self.max_screen_size = 20
+        self.densify_scale_factor = 0.3
+
+        self.split = "mix"
 
         super().__init__(parser, "Optimization Parameters")
 
