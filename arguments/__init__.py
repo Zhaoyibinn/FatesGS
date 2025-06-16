@@ -56,7 +56,7 @@ class ModelParams(ParamGroup):
         self.eval = False
         self.use_mask = False
         self._diff = False
-        self.origin_data = False
+        # self.origin_train = False
         self.no_dust = False
         super().__init__(parser, "Loading Parameters", sentinel)
 
@@ -99,7 +99,7 @@ class OptimizationParams(ParamGroup):
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
 
-        self.origin_train = False
+        # self.origin_train = False
 
         self.lambda_diff_l1 = 0.0
         self.lambda_diff_ssim = 0.2
@@ -110,7 +110,7 @@ class OptimizationParams(ParamGroup):
 
         self.lambda_local_pearson = 0.00
         self.lambda_pearson = 0.00
-        self.no_dust3r = False
+        self.dust3r = False
 
         self.not_record = True
 
@@ -123,6 +123,8 @@ class OptimizationParams(ParamGroup):
         self.contribution_prune_ratio = 0.1
         self.max_screen_size = 20
         self.densify_scale_factor = 0.3
+
+        self.trim = False
 
         self.split = "mix"
 

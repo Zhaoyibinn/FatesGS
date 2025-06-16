@@ -1,3 +1,6 @@
 [submodule "submodules/diff-surfel-rasterization-MCMC"]
 	path = submodules/diff-surfel-rasterization-MCMC
 	url = https://github.com/hwanhuh/diff-surfel-rasterization-MCMC.git
+[submodule "submodules/Viewcrafter"]
+	path = submodules/Viewcrafter
+	url = https://github.com/Zhaoyibinn/ViewCrafter.git

@@ -27,6 +27,22 @@ from utils.feat_utils import FeatExt, load_pair
 from utils.general_utils import PILtoTorch
 import cv2
 
+
+import sys
+sys.path.append("submodules/Viewcrafter")
+sys.path.append("submodules/Viewcrafter/extern/dust3r")
+
+
+import os
+import cv2
+import open3d as o3d
+import numpy as np
+import torch
+
+from Dust3r_class import Dust3r
+
+
+
 # real_idx = []
 real_idx = [0,24,48]
 
@@ -412,6 +428,8 @@ def topk_(matrix, K, axis=1):
     return topk_data_sort
 
 def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
+    if args.dust3r:
+        Dust3r_model = Dust3r()
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
@@ -465,11 +483,18 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
     if eval:
         ply_path = os.path.join(path, "pixelnerf/dense/fused.ply")
     else:
-        if args.origin_data or args.no_dust:
+        if args.dust3r:
+            img_path_list = [train_cam_info.image_path for train_cam_info in train_cam_infos]
+            Dust3r_model.load_data(img_path_list,sparse_colmap_path_root=os.path.join(path, "sparse","0"))
+            Dust3r_model.run_dust3r()
+            Dust3r_model.save_pointcloud_with_normals(filter=True, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"))
+            print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
+            ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
+            
+        else:
             ply_path = os.path.join(path, "sparse/0/points3D_colmap.ply")
             print("直接采用colmap的结果而非其他初始化")
-        else:
-            ply_path = os.path.join(path, "sparse/0/points3D.ply")
+            
 
     if not os.path.exists(ply_path):
         print("Converting point3d.bin to .ply, will happen only the first time you open the scene.")

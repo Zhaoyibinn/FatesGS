@@ -112,7 +112,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         "lambda_diff_dsmooth": opt.lambda_diff_dsmooth,
         "lambda_diff_depth": opt.lambda_diff_depth,
         "lambda_local_pearson": opt.lambda_local_pearson,
-        "origin_fatesgs":opt.origin_train,
+        # "origin_fatesgs":opt.origin_train,
     }
 
     config_save_path = os.path.join(dataset.model_path,"train_conf.json")
@@ -131,8 +131,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
-    dataset.origin_data = opt.origin_train
-    dataset.no_dust = opt.no_dust3r
+    # dataset.origin_train = opt.origin_train
+    dataset.dust3r = opt.dust3r
     # dataset.normals_est = opt.normals_est
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
@@ -183,7 +183,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         total_loss_diff = 0
 
-        if args.diff and not args.origin_train:
+        if args.diff:
         # if False:
             viewpoint_cam_diff = viewpoint_stack_diff.pop(randint(0, len(viewpoint_stack_diff)-1))
             render_pkg_diff = render(viewpoint_cam_diff, gaussians, pipe, background)
@@ -346,7 +346,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
                     if opt.split == "ordinary":
-                        gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, max_screen_size=opt.max_screen_size)
+                        gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold)
 
                     elif opt.split == "scale":
                         scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
@@ -368,9 +368,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     # gaussians.prune_large_and_transparent(0.005, 10.0)
 
                     # TrimGS
-                    # if iteration > opt.contribution_prune_from_iter and iteration % opt.contribution_prune_interval == 0:
-                    #     prune_low_contribution_gaussians(gaussians, all_cameras, pipe, background, K=5, prune_ratio=opt.contribution_prune_ratio)
-                    #     print(f'Num gs after contribution prune: {len(gaussians.get_xyz)}')
+                    if opt.trim and iteration > opt.contribution_prune_from_iter and iteration % opt.contribution_prune_interval == 0:
+                        prune_low_contribution_gaussians(gaussians, all_cameras, pipe, background, K=5, prune_ratio=opt.contribution_prune_ratio)
+                        print(f'Num gs after contribution prune: {len(gaussians.get_xyz)}')
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()

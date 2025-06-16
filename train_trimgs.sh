@@ -9,7 +9,7 @@ scan=37
 cd /home/zhaoyibin/3DRE/3DGS/FatesGS
 conda_env="/home/zhaoyibin/anaconda3/envs/fatesgstrim/bin/python"
 conda activate fatesgstrim
-data_dir="DTU/set_23_24_33/scan$scan"
+data_dir="DTU/diff/set_23_24_33/scan$scan"
 
 
 output_dir="output/test_dust$scan"
@@ -17,7 +17,7 @@ output_dir="output/test_dust$scan"
 # output_dir="output/set_23_24_33_dtu$scan"
 echo -e "${RED}$output_dir${NC}"
 
-$conda_env train.py -s $data_dir -m $output_dir -r 2
+$conda_env train.py -s $data_dir -m $output_dir -r 2  --split mix --diff --origin_train --contribution_prune_from_iter 99999
 $conda_env render.py -s $data_dir -m $output_dir -r 2 
 
 result_dir=$output_dir

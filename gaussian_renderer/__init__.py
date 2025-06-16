@@ -33,23 +33,41 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
     # Set up rasterization configuration
     tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
     tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
-
-    raster_settings = GaussianRasterizationSettings(
-        image_height=int(viewpoint_camera.image_height),
-        image_width=int(viewpoint_camera.image_width),
-        tanfovx=tanfovx,
-        tanfovy=tanfovy,
-        bg=bg_color,
-        scale_modifier=scaling_modifier,
-        viewmatrix=viewpoint_camera.world_view_transform,
-        projmatrix=viewpoint_camera.full_proj_transform,
-        sh_degree=pc.active_sh_degree,
-        campos=viewpoint_camera.camera_center,
-        prefiltered=False,
-        record_transmittance=record_transmittance,
-        debug=False,
-        # pipe.debug
-    )
+    try:
+        raster_settings = GaussianRasterizationSettings(
+            image_height=int(viewpoint_camera.image_height),
+            image_width=int(viewpoint_camera.image_width),
+            tanfovx=tanfovx,
+            tanfovy=tanfovy,
+            bg=bg_color,
+            scale_modifier=scaling_modifier,
+            viewmatrix=viewpoint_camera.world_view_transform,
+            projmatrix=viewpoint_camera.full_proj_transform,
+            sh_degree=pc.active_sh_degree,
+            campos=viewpoint_camera.camera_center,
+            prefiltered=False,
+            record_transmittance=record_transmittance,
+            debug=False,
+            # pipe.debug
+        )
+        trimgs = True
+    except:
+        raster_settings = GaussianRasterizationSettings(
+            image_height=int(viewpoint_camera.image_height),
+            image_width=int(viewpoint_camera.image_width),
+            tanfovx=tanfovx,
+            tanfovy=tanfovy,
+            bg=bg_color,
+            scale_modifier=scaling_modifier,
+            viewmatrix=viewpoint_camera.world_view_transform,
+            projmatrix=viewpoint_camera.full_proj_transform,
+            sh_degree=pc.active_sh_degree,
+            campos=viewpoint_camera.camera_center,
+            prefiltered=False,
+            debug=False,
+            # pipe.debug
+        )
+        trimgs = False
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
@@ -113,12 +131,14 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
         rotations = rotations,
         cov3D_precomp = cov3D_precomp
     )
-    if record_transmittance:
-        transmittance_sum, num_covered_pixels, radii = rendered_image, radii, allmap
-        transmittance = transmittance_sum / (num_covered_pixels + 1e-6)
-        return transmittance
-    else:
-        rendered_image, radii, allmap = rendered_image, radii, allmap
+
+    if trimgs:
+        if record_transmittance:
+            transmittance_sum, num_covered_pixels, radii = rendered_image, radii, allmap
+            transmittance = transmittance_sum / (num_covered_pixels + 1e-6)
+            return transmittance
+        else:
+            rendered_image, radii, allmap = rendered_image, radii, allmap
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
     # They will be excluded from value updates used in the splitting criteria.
