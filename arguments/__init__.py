@@ -116,7 +116,7 @@ class OptimizationParams(ParamGroup):
 
         self.drop = False
 
-        self.lambda_normal_est = 0.1
+        self.lambda_normal_est = 0.0
 
         super().__init__(parser, "Optimization Parameters")
 
