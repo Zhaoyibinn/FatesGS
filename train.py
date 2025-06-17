@@ -14,7 +14,7 @@ import torch
 from random import randint
 from utils.loss_utils import l1_loss, ssim, TVLoss, get_depth_ranking_loss,local_pearson_loss,pearson_depth_loss
 from utils.feat_utils import get_feat_loss
-from utils.point_utils import depth_to_normal
+from utils.point_utils import depth_to_normal,depth_to_normal_dust3r
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -274,13 +274,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             mask_dust3r = torch.tensor(viewpoint_cam.dust3r_mask_resized, device="cuda").unsqueeze(0)
             conf_dust3r = (torch.tensor(viewpoint_cam.dust3r_conf_resized, device="cuda").unsqueeze(0) / 10).clip(0,1)
 
-            normal_dust3r = depth_to_normal(viewpoint_cam, dust3r_depth).permute(2,0,1)
-
+            normal_dust3r = depth_to_normal_dust3r(viewpoint_cam, dust3r_depth,viewpoint_cam.dust3r_conf_resized).permute(2,0,1)
+            # cv2.imwrite("test.png",cv2.cvtColor(np.abs(np.array(depth_to_normal_dust3r(viewpoint_cam, dust3r_depth,viewpoint_cam.dust3r_conf_resized))),cv2.COLOR_RGB2BGR) * 255)
 
             # normal_render = render_pkg["rend_normal"]
             normal_render = depth_to_normal(viewpoint_cam, surf_depth).permute(2,0,1)
+            # cv2.imwrite("test.png",np.array(depth_to_normal(viewpoint_cam, surf_depth).cpu().detach()) * 255)
 
-            
+            # cv2.imwrite("test.png",depth_to_normal(viewpoint_cam, dust3r_depth).cpu().detach().numpy() * 255)
+            # cv2.imwrite("test.png",surf_depth[0].cpu().detach().numpy() * 30)
             dust3_normal_loss = (1 - ((normal_render * conf_dust3r) * (normal_dust3r * conf_dust3r)).sum(dim=0))[None].mean()
             # dust3r_depth_loss = get_depth_ranking_loss(surf_depth, dust3r_depth[0], mask_dust3r.bool())
 
