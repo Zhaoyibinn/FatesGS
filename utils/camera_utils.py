@@ -91,12 +91,17 @@ def loadCam(args, id, cam_info, resolution_scale):
     if cam_info.mono_depth is not None:
         mono_depth = torch.tensor(cam_info.mono_depth).cuda().detach()
 
+
     return Camera(colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T,
                   FoVx=cam_info.FovX, FoVy=cam_info.FovY,
                   image=gt_image, gt_alpha_mask=loaded_mask,
                   image_name=cam_info.image_name, uid=id,
                   feats=cam_info.feat, mono_depth=mono_depth, normal = cam_info.normal , pair=cam_info.pair,
-                  use_mask=args.use_mask, data_device=args.data_device)
+                  use_mask=args.use_mask, data_device=args.data_device,
+                  dust3r_depth = cam_info.dust3r_depth,dust3r_depth_resized = cam_info.dust3r_depth_resized,
+                  dust3r_mask = cam_info.dust3r_mask,dust3r_mask_resized = cam_info.dust3r_mask_resized,
+                  dust3r_conf = cam_info.dust3r_conf,dust3r_conf_resized = cam_info.dust3r_conf_resized
+                  )
 
 def cameraList_from_camInfos(cam_infos, resolution_scale, args):
     camera_list = []

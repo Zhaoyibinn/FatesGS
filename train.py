@@ -14,6 +14,7 @@ import torch
 from random import randint
 from utils.loss_utils import l1_loss, ssim, TVLoss, get_depth_ranking_loss,local_pearson_loss,pearson_depth_loss
 from utils.feat_utils import get_feat_loss
+from utils.point_utils import depth_to_normal
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -182,7 +183,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], \
             render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         total_loss_diff = 0
-
+        
         if args.diff:
         # if False:
             viewpoint_cam_diff = viewpoint_stack_diff.pop(randint(0, len(viewpoint_stack_diff)-1))
@@ -266,6 +267,26 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         surf_depth = render_pkg["surf_depth"]
         mono_depth = viewpoint_cam.mono_depth
+        dust3r_depth_loss = 0
+        dust3_normal_loss = 0
+        if opt.dust3r:
+            dust3r_depth = torch.tensor(viewpoint_cam.dust3r_depth_resized, device="cuda").unsqueeze(0)
+            mask_dust3r = torch.tensor(viewpoint_cam.dust3r_mask_resized, device="cuda").unsqueeze(0)
+            conf_dust3r = (torch.tensor(viewpoint_cam.dust3r_conf_resized, device="cuda").unsqueeze(0) / 10).clip(0,1)
+
+            normal_dust3r = depth_to_normal(viewpoint_cam, dust3r_depth).permute(2,0,1)
+
+
+            # normal_render = render_pkg["rend_normal"]
+            normal_render = depth_to_normal(viewpoint_cam, surf_depth).permute(2,0,1)
+
+            
+            dust3_normal_loss = (1 - ((normal_render * conf_dust3r) * (normal_dust3r * conf_dust3r)).sum(dim=0))[None].mean()
+            # dust3r_depth_loss = get_depth_ranking_loss(surf_depth, dust3r_depth[0], mask_dust3r.bool())
+
+            
+
+
 
         dsmooth_loss = TVLoss(surf_depth, mono_depth.unsqueeze(0))
 
@@ -296,7 +317,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # loss
         total_loss = loss + dist_loss + normal_loss + dsmooth_loss + opt.lambda_local_pearson * Local_pearson_loss+ opt.lambda_pearson * pearson_loss + \
             opt.lambda_feat * feat_loss + \
-            opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff + opt.lambda_normal_est * est_normal_loss
+            opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff + opt.lambda_normal_est * est_normal_loss + \
+            opt.lambda_dust3r_depth * dust3r_depth_loss + opt.lambda_dust3r_normal * dust3_normal_loss
 
         total_loss.backward()
 

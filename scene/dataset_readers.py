@@ -62,6 +62,33 @@ class CameraInfo(NamedTuple):
     mono_depth: np.array = None
     normal: np.array = None
     mask: np.array = None
+    dust3r_mask: np.array = None
+    dust3r_depth: np.array = None
+    dust3r_conf: np.array = None
+    dust3r_mask_resized: np.array = None
+    dust3r_depth_resized: np.array = None
+    dust3r_conf_resized: np.array = None
+
+    def add_dust3r_mask(self,mask):
+        return self._replace(dust3r_mask=mask)
+    
+    def add_dust3r_depth(self,depth):
+        return self._replace(dust3r_depth=depth)
+    
+    def add_dust3r_conf(self,conf):
+        return self._replace(dust3r_conf=conf)
+    
+    
+    def add_dust3r_mask_resized(self,mask):
+        return self._replace(dust3r_mask_resized=mask)
+    
+    def add_dust3r_depth_resized(self,depth):
+        return self._replace(dust3r_depth_resized=depth)
+    
+    def add_dust3r_conf_resized(self,conf):
+        return self._replace(dust3r_conf_resized=conf)
+    
+
 
 class SceneInfo(NamedTuple):
     point_cloud: BasicPointCloud
@@ -486,8 +513,21 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
         if args.dust3r:
             img_path_list = [train_cam_info.image_path for train_cam_info in train_cam_infos]
             Dust3r_model.load_data(img_path_list,sparse_colmap_path_root=os.path.join(path, "sparse","0"))
-            Dust3r_model.run_dust3r()
-            Dust3r_model.save_pointcloud_with_normals(filter=True, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"))
+            Dust3r_model.run_dust3r(args.resolution)
+
+            # cv2.imwrite("test.png",np.array(train_cam_infos[0].image)[:,:,:3][:,:,2]  * train_cam_infos[0].mask )
+            for i in range(len(train_cam_infos)):
+                train_cam_infos[i] = train_cam_infos[i].add_dust3r_mask(Dust3r_model.masks_filtered[i] * 1)
+                train_cam_infos[i] = train_cam_infos[i].add_dust3r_mask_resized(Dust3r_model.masks_filtered_resized[i])
+
+                train_cam_infos[i] = train_cam_infos[i].add_dust3r_depth(Dust3r_model.depth[i].cpu().detach().numpy())
+                train_cam_infos[i] = train_cam_infos[i].add_dust3r_depth_resized(Dust3r_model.depth_resized[i])
+
+                train_cam_infos[i] = train_cam_infos[i].add_dust3r_conf(Dust3r_model.conf_img[i])
+                train_cam_infos[i] = train_cam_infos[i].add_dust3r_conf_resized(Dust3r_model.conf_img_resized[i])
+
+
+            Dust3r_model.save_pointcloud_with_normals(filter=True, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = 0.005)
             print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
             ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
             

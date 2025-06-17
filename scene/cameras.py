@@ -18,7 +18,8 @@ from utils.graphics_utils import getWorld2View2, getProjectionMatrix
 class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
                  image_name, uid, feats, mono_depth, normal,pair, use_mask=False,
-                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda"
+                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda",
+                 dust3r_depth = None,dust3r_depth_resized = None,dust3r_mask = None,dust3r_mask_resized = None,dust3r_conf = None,dust3r_conf_resized = None
                  ):
         super(Camera, self).__init__()
 
@@ -32,7 +33,12 @@ class Camera(nn.Module):
         self.mono_depth = mono_depth
         self.normal = normal
         self.pair = pair
-        
+        self.dust3r_depth = dust3r_depth
+        self.dust3r_depth_resized = dust3r_depth_resized
+        self.dust3r_mask = dust3r_mask
+        self.dust3r_mask_resized = dust3r_mask_resized
+        self.dust3r_conf = dust3r_conf
+        self.dust3r_conf_resized = dust3r_conf_resized
 
         try:
             self.data_device = torch.device(data_device)
