@@ -372,7 +372,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
                     if opt.split == "ordinary":
-                        gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold)
+                        gaussians.densify_and_prune(opt.densify_grad_threshold, opt.densify_grad_abs_threshold, 0.005, scene.cameras_extent, size_threshold)
 
                     elif opt.split == "scale":
                         scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
@@ -391,7 +391,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                     # gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold)
 
-                    # gaussians.prune_large_and_transparent(0.005, 10.0)
+                    
+                    # # gaussians.prune_large_and_transparent(0.005, 10.0)
 
                     # TrimGS
                     if opt.trim and iteration > opt.contribution_prune_from_iter and iteration % opt.contribution_prune_interval == 0:
@@ -400,6 +401,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
+
+
 
             # Optimizer step
             if iteration < opt.iterations:
