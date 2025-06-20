@@ -132,6 +132,8 @@ class OptimizationParams(ParamGroup):
         self.lambda_dust3r_depth = 0.0
         self.lambda_dust3r_normal = 0.0
 
+        self.absgs = False
+
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):
