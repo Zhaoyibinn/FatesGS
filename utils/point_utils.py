@@ -62,4 +62,4 @@ def depth_to_normal_dust3r(view, depth,conf):
     # dy = torch.cat([points[1:-1, 2:] - points[1:-1, :-2]], dim=1)
     # normal_map = torch.nn.functional.normalize(torch.cross(dx, dy, dim=-1), dim=-1)
     # output[1:-1, 1:-1, :] = normal_map
-    return torch.tensor(normal_map)
+    return torch.tensor(normal_map).cuda()

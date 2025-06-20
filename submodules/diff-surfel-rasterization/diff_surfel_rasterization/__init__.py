@@ -89,7 +89,16 @@ class _RasterizeGaussians(torch.autograd.Function):
                 print("\nAn error occured in forward. Please forward snapshot_fw.dump for debugging.")
                 raise ex
         else:
-            num_rendered, color, depth, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
+            num_rendered, color, depth, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args) 
+            # 原本只有这一行
+            # import time
+            # torch.cuda.synchronize()  # Ensure all previous operations are complete
+            # start_time = time.perf_counter()
+
+            # num_rendered, color, depth, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
+            # torch.cuda.synchronize()  
+            # end  = time.perf_counter()
+            # print(f"Rasterization took {end - start_time:.4f} seconds")
 
         # Keep relevant tensors for backward
         ctx.raster_settings = raster_settings

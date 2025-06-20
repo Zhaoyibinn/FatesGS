@@ -239,6 +239,8 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
 
         if os.path.exists(depth_path):
             depth = np.load(depth_path)
+            depth[cv2.resize(np.array(image)[:,:,0],(depth.shape[1],depth.shape[0]),cv2.INTER_NEAREST) ==0] = 0
+            # 纯黑的地方就不要depth
         if os.path.exists(normal_path):
             normal = cv2.imread(normal_path,cv2.IMREAD_UNCHANGED)
             normal = cv2.resize(normal,(normal.shape[1],normal.shape[0]))
@@ -527,7 +529,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
                 train_cam_infos[i] = train_cam_infos[i].add_dust3r_conf_resized(Dust3r_model.conf_img_resized[i])
 
 
-            Dust3r_model.save_pointcloud_with_normals(filter=True, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = 0.005)
+            Dust3r_model.save_pointcloud_with_normals(filter=True, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = None)
             print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
             ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
             

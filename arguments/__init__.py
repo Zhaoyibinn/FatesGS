@@ -119,7 +119,7 @@ class OptimizationParams(ParamGroup):
         self.lambda_normal_est = 0.0
 
         self.contribution_prune_from_iter = 500
-        self.contribution_prune_interval = 2000
+        self.contribution_prune_interval = 500
         self.contribution_prune_ratio = 0.1
         self.max_screen_size = 20
         self.densify_scale_factor = 0.3
