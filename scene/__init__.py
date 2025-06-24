@@ -13,6 +13,7 @@ import os
 import random
 import json
 from utils.system_utils import searchForMaxIteration
+from utils.mvs_depth_consistency_utils import *
 from scene.dataset_readers import sceneLoadTypeCallbacks
 from scene.gaussian_model import GaussianModel
 from arguments import ModelParams,OptimizationParams
@@ -75,16 +76,24 @@ class Scene:
             random.shuffle(scene_info.test_cameras)  # Multi-res consistent random shuffling
             random.shuffle(scene_info.train_cameras_diff)  # Multi-res consistent random shuffling
 
+        self.mvs_filter_masks = []
+        if self.args.mvs_filter:
+            print("进行基于MVS多视角一致性检查")
+            self.mvs_filter(scene_info.train_cameras)
         self.cameras_extent = scene_info.nerf_normalization["radius"]
 
         for resolution_scale in resolution_scales:
             print("Loading Training Cameras")
-            self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale, args)
+            self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale, args,mvs_filter_masks = self.mvs_filter_masks)
             print("Loading Test Cameras")
-            self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale, args)
+            self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale, args,mvs_filter_masks = self.mvs_filter_masks)
             if scene_info.train_cameras_diff:
                 print("Loading Diffusion Training Cameras")
-                self.train_cameras_diff[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras_diff, resolution_scale, args)
+                self.train_cameras_diff[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras_diff, resolution_scale, args,mvs_filter_masks = self.mvs_filter_masks)
+
+
+
+
 
         if self.loaded_iter:
             self.gaussians.load_ply(os.path.join(self.model_path,
@@ -93,6 +102,59 @@ class Scene:
                                                            "point_cloud.ply"))
         else:
             self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
+
+    def mvs_filter(self,train_cameras):
+        
+        all_ref_idxs = []
+        for ii in range(len(train_cameras)):
+            range_num = 2
+            ref_tart = max(0, ii - range_num)
+            ref_end = min(len(train_cameras)-1, ii + range_num)
+            ref_idxs = list(range(ref_tart, ref_end + 1))
+            ref_idxs.remove(ii)
+            all_ref_idxs.append(ref_idxs)
+            dy_range = len(ref_idxs)
+
+        for ii in range(len(train_cameras)):
+            current_camera = train_cameras[ii]
+            current_ext_mat = self.cameras_trans_for_mvs(current_camera)
+            current_in_mat = current_camera.K
+            current_in_mat[0][0] = current_in_mat[1][1] = 951.4357
+            current_in_mat[0][2] = 256.0
+            current_in_mat[1][2] = 144.0
+            current_depth = current_camera.dust3r_depth
+            ref_idxs = all_ref_idxs[ii]
+
+            geo_mask_sum = 0
+            
+            for ref_idx in ref_idxs:
+                ref_camera = train_cameras[ref_idx]
+                ref_ext_mat = self.cameras_trans_for_mvs(ref_camera)
+                ref_in_mat = ref_camera.K
+                ref_in_mat[0][0] = ref_in_mat[1][1] = 951.4357
+                ref_in_mat[0][2] = 256.0
+                ref_in_mat[1][2] = 144.0
+                ref_depth = ref_camera.dust3r_depth
+
+                masks, masks_per,depth_reprojected, x2d_src, y2d_src = check_geometric_consistency(current_depth,current_in_mat,current_ext_mat,ref_depth,ref_in_mat,ref_ext_mat)
+                
+                geo_mask_sum += masks[140].astype(np.int32)
+            geo_mask = geo_mask_sum >= dy_range * 0.9
+            self.mvs_filter_masks.append(geo_mask)
+            print(f"相机{ii} 过滤后还剩{np.mean(geo_mask)}的点")
+            print("ok")
+
+        return 0
+        
+
+    def cameras_trans_for_mvs(self,camera):
+        current_R , current_t = camera.R,camera.T
+        current_ext_mat = np.eye(4)
+        current_ext_mat[:3,:3] = current_R.T
+        current_ext_mat[:3,3] = current_t
+
+        return current_ext_mat # C2W
+        # return np.linalg.inv(current_ext_mat) #W2C
 
     def save(self, iteration):
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))

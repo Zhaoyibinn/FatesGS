@@ -134,6 +134,8 @@ class OptimizationParams(ParamGroup):
 
         self.absgs = False
 
+        self.mvs_filter = False
+        
         super().__init__(parser, "Optimization Parameters")
 
 def get_combined_args(parser : ArgumentParser):

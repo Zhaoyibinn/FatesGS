@@ -53,7 +53,7 @@ WARNED = False
 
 #     return
 
-def loadCam(args, id, cam_info, resolution_scale):
+def loadCam(args, id, cam_info, resolution_scale,mvs_filter_masks = []):
     orig_w, orig_h = cam_info.image.size
 
     if args.resolution in [1, 2, 4, 8]:
@@ -100,14 +100,17 @@ def loadCam(args, id, cam_info, resolution_scale):
                   use_mask=args.use_mask, data_device=args.data_device,
                   dust3r_depth = cam_info.dust3r_depth,dust3r_depth_resized = cam_info.dust3r_depth_resized,
                   dust3r_mask = cam_info.dust3r_mask,dust3r_mask_resized = cam_info.dust3r_mask_resized,
-                  dust3r_conf = cam_info.dust3r_conf,dust3r_conf_resized = cam_info.dust3r_conf_resized
+                  dust3r_conf = cam_info.dust3r_conf,dust3r_conf_resized = cam_info.dust3r_conf_resized,mvs_filter_masks = mvs_filter_masks
                   )
 
-def cameraList_from_camInfos(cam_infos, resolution_scale, args):
+def cameraList_from_camInfos(cam_infos, resolution_scale, args,mvs_filter_masks = []):
     camera_list = []
-
-    for id, c in enumerate(cam_infos):
-        camera_list.append(loadCam(args, id, c, resolution_scale))
+    if mvs_filter_masks == []:
+        for id, c in enumerate(cam_infos):
+            camera_list.append(loadCam(args, id, c, resolution_scale,mvs_filter_masks = None))
+    else:
+        for id, c in enumerate(cam_infos):
+            camera_list.append(loadCam(args, id, c, resolution_scale,mvs_filter_masks = mvs_filter_masks[id]))
 
     return camera_list
 

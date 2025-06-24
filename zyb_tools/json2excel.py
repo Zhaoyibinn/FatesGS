@@ -6,10 +6,10 @@ def custom_sort_key(x):
     return int(x[3:]) 
 
 allsense = [24 ,37, 40, 55,63, 65 ,69 ,83 ,97 ,105 ,106 ,110 ,114 ,118 ,122]
-excel_file = "test.xlsx"
+excel_file = "test_new.xlsx"
 # root_path = "pilianghua_output2/origin"
 # main_columns = ["origin", "ssim_l1_diff","ssim_l1_normal_dist_diff","ssimdiff","alllossdiff", "ssimdiff_manyrender"]
-main_columns = ["origin", "ssimdiff","ssim_l1_normal_dist_diff","ssimdiff_manyrender","nodust3r","nofates","nofeat","nodepth"]
+main_columns = ["origin", "dust3r","dust3r_abs","dust3r_abs_trim","dust3r_abs_trim_splitmix"]
 
 
 
@@ -20,7 +20,7 @@ all_all_data = []
 
 for i in main_columns:
     all_data = []
-    root_path = os.path.join("pilianghua_output",i)
+    root_path = os.path.join("pilianghua_out_new",i)
     for sense_idx in allsense:
         sense = "dtu"+str(sense_idx)
         json_file = os.path.join(root_path,sense,"results.json")

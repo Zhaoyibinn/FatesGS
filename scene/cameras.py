@@ -19,7 +19,8 @@ class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
                  image_name, uid, feats, mono_depth, normal,pair, use_mask=False,
                  trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda",
-                 dust3r_depth = None,dust3r_depth_resized = None,dust3r_mask = None,dust3r_mask_resized = None,dust3r_conf = None,dust3r_conf_resized = None
+                 dust3r_depth = None,dust3r_depth_resized = None,dust3r_mask = None,dust3r_mask_resized = None,dust3r_conf = None,dust3r_conf_resized = None,
+                 mvs_filter_masks = None
                  ):
         super(Camera, self).__init__()
 
@@ -39,6 +40,8 @@ class Camera(nn.Module):
         self.dust3r_mask_resized = dust3r_mask_resized
         self.dust3r_conf = dust3r_conf
         self.dust3r_conf_resized = dust3r_conf_resized
+        
+        self.mvs_filter_masks = mvs_filter_masks
 
         try:
             self.data_device = torch.device(data_device)

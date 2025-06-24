@@ -18,7 +18,7 @@ from gaussian_renderer import render
 import torchvision
 from utils.general_utils import safe_state
 from argparse import ArgumentParser
-from arguments import ModelParams, PipelineParams, get_combined_args
+from arguments import ModelParams, PipelineParams,OptimizationParams, get_combined_args
 from gaussian_renderer import GaussianModel
 from utils.mesh_utils import GaussianExtractor, to_cam_open3d, post_process_mesh
 from utils.render_utils import generate_path, create_videos
@@ -28,6 +28,7 @@ import open3d as o3d
 if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Testing script parameters")
+    op = OptimizationParams(parser)
     model = ModelParams(parser, sentinel=True)
     pipeline = PipelineParams(parser)
     parser.add_argument("--iteration", default=-1, type=int)
@@ -47,16 +48,17 @@ if __name__ == "__main__":
     print("Rendering " + args.model_path)
 
 
-    dataset, iteration, pipe = model.extract(args), args.iteration, pipeline.extract(args)
+    dataset, iteration, pipe,opt = model.extract(args), args.iteration, pipeline.extract(args),op.extract(args)
     gaussians = GaussianModel(dataset.sh_degree)
     dataset.dust3r = False
+    dataset.mvs_filter = False
     scene = Scene(dataset, gaussians, load_iteration=iteration, shuffle=False)
     bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
     background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
     train_dir = os.path.join(args.model_path, 'train', "ours_{}".format(scene.loaded_iter))
     test_dir = os.path.join(args.model_path, 'test', "ours_{}".format(scene.loaded_iter))
-    gaussExtractor = GaussianExtractor(gaussians, render, pipe, bg_color=bg_color)
+    gaussExtractor = GaussianExtractor(gaussians, render, pipe,bg_color=bg_color)
 
     if not args.skip_train:
         print("export training images ...")

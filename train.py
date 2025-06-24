@@ -135,6 +135,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     gaussians = GaussianModel(dataset.sh_degree)
     # dataset.origin_train = opt.origin_train
     dataset.dust3r = opt.dust3r
+    dataset.mvs_filter = opt.mvs_filter
     # dataset.normals_est = opt.normals_est
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
@@ -381,8 +382,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     elif opt.split == "mix":
                         grads = gaussians.xyz_gradient_accum / gaussians.denom
                         grads[grads.isnan()] = 0.0
+                        grads_abs = gaussians.xyz_gradient_accum_abs / gaussians.denom
+                        grads_abs[grads_abs.isnan()] = 0.0
                         gaussians.densify_and_clone(grads, opt.densify_grad_threshold, scene.cameras_extent)
-                        gaussians.densify_and_split(grads, opt.densify_grad_threshold, scene.cameras_extent)
+                        if opt.absgs:
+                            gaussians.densify_and_split(grads_abs, opt.densify_grad_abs_threshold, scene.cameras_extent)
+                        else:
+                            gaussians.densify_and_split(grads, opt.densify_grad_threshold, scene.cameras_extent)
+
+                        # gaussians.densify_and_split(grads, opt.densify_grad_threshold, scene.cameras_extent)
                         scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
                         gaussians.densify_and_scale_split(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, opt.max_screen_size, opt.densify_scale_factor, scene_mask, N=3, no_grad=True)
 

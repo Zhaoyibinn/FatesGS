@@ -68,6 +68,7 @@ class CameraInfo(NamedTuple):
     dust3r_mask_resized: np.array = None
     dust3r_depth_resized: np.array = None
     dust3r_conf_resized: np.array = None
+    K: np.array = None
 
     def add_dust3r_mask(self,mask):
         return self._replace(dust3r_mask=mask)
@@ -213,11 +214,20 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
             focal_length_x = intr.params[0]
             FovY = focal2fov(focal_length_x, height)
             FovX = focal2fov(focal_length_x, width)
+            
+            cx = intr.params[1]
+            cy = intr.params[2]
+            K = [[focal_length_x,0,cx],[0,focal_length_x,cy],[0,0,1]]
         elif intr.model=="PINHOLE":
             focal_length_x = intr.params[0]
             focal_length_y = intr.params[1]
             FovY = focal2fov(focal_length_y, height)
             FovX = focal2fov(focal_length_x, width)
+            
+            cx = intr.params[2]
+            cy = intr.params[3]
+
+            K = [[focal_length_x,0,cx],[0,focal_length_y,cy],[0,0,1]]
         else:
             assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
 
@@ -262,12 +272,12 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
             cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                               image_path=image_path, image_name=image_name, width=width, height=height,
                               feat=[feats[real_idx.index(int(image_name))] for feats in feats_list],
-                              pair=[int(idx) for idx in pair], mono_depth=depth, normal = normal,mask=mask)
+                              pair=[int(idx) for idx in pair], mono_depth=depth, normal = normal,mask=mask,K=K)
         else:
             cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                                 image_path=image_path, image_name=image_name, width=width, height=height,
                                 feat=[feats[int(image_name)] for feats in feats_list],
-                                pair=[int(idx) for idx in pair], mono_depth=depth,normal = normal, mask=mask)
+                                pair=[int(idx) for idx in pair], mono_depth=depth,normal = normal, mask=mask,K=K)
         # cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
         #                       image_path=image_path, image_name=image_name, width=width, height=height,
         #                       feat=[feats[int(image_name)] for feats in feats_list], mono_depth=depth, mask=mask)
@@ -369,11 +379,21 @@ def readColmapCameras_diff(path, cam_extrinsics, cam_intrinsics, images_folder, 
             focal_length_x = intr.params[0]
             FovY = focal2fov(focal_length_x, height)
             FovX = focal2fov(focal_length_x, width)
+            
+            cx = intr.params[1]
+            cy = intr.params[2]
+            K = [[focal_length_x,0,cx],[0,focal_length_x,cy],[0,0,1]]
         elif intr.model=="PINHOLE":
             focal_length_x = intr.params[0]
             focal_length_y = intr.params[1]
             FovY = focal2fov(focal_length_y, height)
             FovX = focal2fov(focal_length_x, width)
+            
+            cx = intr.params[2]
+            cy = intr.params[3]
+
+            K = [[focal_length_x,0,cx],[0,focal_length_y,cy],[0,0,1]]
+
         else:
             assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
 
@@ -405,7 +425,7 @@ def readColmapCameras_diff(path, cam_extrinsics, cam_intrinsics, images_folder, 
         cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                             image_path=image_path, image_name=image_name, width=width, height=height,
                             feat=[feats[diff_img_idx.index(int(image_name))] for feats in feats_list],
-                            pair=[int(idx) for idx in pair], mono_depth=depth, mask=mask)
+                            pair=[int(idx) for idx in pair], mono_depth=depth, mask=mask,K=K)
 
         # cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
         #                       image_path=image_path, image_name=image_name, width=width, height=height,
@@ -529,7 +549,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
                 train_cam_infos[i] = train_cam_infos[i].add_dust3r_conf_resized(Dust3r_model.conf_img_resized[i])
 
 
-            Dust3r_model.save_pointcloud_with_normals(filter=True, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = None)
+            Dust3r_model.save_pointcloud_with_normals(filter=args.mvs_filter, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = 0.005)
             print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
             ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
             
