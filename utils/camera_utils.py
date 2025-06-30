@@ -105,7 +105,7 @@ def loadCam(args, id, cam_info, resolution_scale,mvs_filter_masks = []):
 
 def cameraList_from_camInfos(cam_infos, resolution_scale, args,mvs_filter_masks = []):
     camera_list = []
-    if mvs_filter_masks == []:
+    if mvs_filter_masks == [] or cam_infos.__len__() >3:
         for id, c in enumerate(cam_infos):
             camera_list.append(loadCam(args, id, c, resolution_scale,mvs_filter_masks = None))
     else:

@@ -534,7 +534,10 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
     else:
         if args.dust3r:
             img_path_list = [train_cam_info.image_path for train_cam_info in train_cam_infos]
-            Dust3r_model.load_data(img_path_list,sparse_colmap_path_root=os.path.join(path, "sparse","0"))
+            if not args.diff:
+                Dust3r_model.load_data(img_path_list,sparse_colmap_path_root=os.path.join(path, "sparse","0"))
+            else:
+                Dust3r_model.load_data(img_path_list,sparse_colmap_path_root=os.path.join(path, "sparse","origin"))
             Dust3r_model.run_dust3r(args.resolution)
 
             # cv2.imwrite("test.png",np.array(train_cam_infos[0].image)[:,:,:3][:,:,2]  * train_cam_infos[0].mask )
@@ -549,7 +552,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
                 train_cam_infos[i] = train_cam_infos[i].add_dust3r_conf_resized(Dust3r_model.conf_img_resized[i])
 
 
-            Dust3r_model.save_pointcloud_with_normals(filter=args.mvs_filter, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = 0.005)
+            Dust3r_model.save_pointcloud_with_normals(filter=args.mvs_filter, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = None)
             print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
             ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
             

@@ -158,6 +158,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
     print(f"检测到原本训练视角 {len(scene.getTrainCameras())}")
+    print(f"检测到扩散模型训练视角 {len(scene.getTrainCameras_diff())}")
     with open(config_save_path, 'w') as f:
         json.dump(train_config, f)
     all_cameras = scene.getTrainCameras().copy()
@@ -177,6 +178,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         if not viewpoint_stack_diff:
             if args.diff:
                 viewpoint_stack_diff = scene.getTrainCameras_diff().copy()
+                
 
         
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
@@ -517,7 +519,7 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
     parser.add_argument("--test_iterations", nargs="+", type=int, default=[3000,5000,10000, 15_000])
-    parser.add_argument("--save_iterations", nargs="+", type=int, default=[1000,3_000, 15_000])
+    parser.add_argument("--save_iterations", nargs="+", type=int, default=[1,1000,3_000, 15_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)

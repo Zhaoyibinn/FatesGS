@@ -2,9 +2,9 @@ import cv2
 import os
 
 # 视频文件路径
-video_path = '/home/zhaoyibin/3DRE/3DGS/FatesGS/DTU/diff/DTU_3_2/scan63/render.mp4'
+video_path = '/home/zhaoyibin/3DRE/3DGS/FatesGS/DTU/diff/DTU_3/scan55/diffusion.mp4'
 # 保存帧的文件夹路径
-save_folder = 'jiaojie_render'
+save_folder = 'jiaojie_diffusion'
 
 def MP42PNG(video_path,images_dir):
     cap = cv2.VideoCapture(video_path)
