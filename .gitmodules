@@ -4,3 +4,6 @@
 [submodule "submodules/Viewcrafter"]
 	path = submodules/Viewcrafter
 	url = https://github.com/Zhaoyibinn/ViewCrafter.git
+[submodule "submodules/2DGS-AbsGS-diff-gaussian-rasterization"]
+	path = submodules/2DGS-AbsGS-diff-gaussian-rasterization
+	url = https://github.com/hjh530/2DGS-AbsGS-diff-gaussian-rasterization.git
