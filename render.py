@@ -22,7 +22,7 @@ from arguments import ModelParams, PipelineParams,OptimizationParams, get_combin
 from gaussian_renderer import GaussianModel
 from utils.mesh_utils import GaussianExtractor, to_cam_open3d, post_process_mesh
 from utils.render_utils import generate_path, create_videos
-
+import sys
 import open3d as o3d
 
 if __name__ == "__main__":
@@ -44,8 +44,10 @@ if __name__ == "__main__":
     parser.add_argument("--num_cluster", default=50, type=int, help='Mesh: number of connected clusters to export')
     parser.add_argument("--unbounded", action="store_true", help='Mesh: using unbounded mode for meshing')
     parser.add_argument("--mesh_res", default=1024, type=int, help='Mesh: resolution for unbounded mesh extraction')
+    # parser.add_argument("--diff", default=False, type=bool, help='diffusion')
     args = get_combined_args(parser)
     print("Rendering " + args.model_path)
+    # args = parser.parse_args(sys.argv[1:])
 
 
     dataset, iteration, pipe,opt = model.extract(args), args.iteration, pipeline.extract(args),op.extract(args)

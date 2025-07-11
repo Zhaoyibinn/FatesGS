@@ -37,7 +37,7 @@ def MP42PNG(video_path,images_dir):
                 # 生成存储帧的文件名
                 frame_filename = os.path.join(images_dir, f'{frame_count:04d}.png')
                 # 保存帧为图像文件
-                frame = cv2.resize(frame, (768, 576), interpolation=cv2.INTER_CUBIC)
+                frame = cv2.resize(frame, (1200, 680), interpolation=cv2.INTER_CUBIC)
                 cv2.imwrite(frame_filename, frame)
                 frame_count += 1
             else:
@@ -63,19 +63,19 @@ def rename_images(folder_path):
         # print(f"已将 {old_file_path} 重命名为 {new_file_path}")
 
 # for idx in [24 ,37, 40, 63, 65 ,69 ,83 ,97 ,105 ,106 ,110 ,114 ,118 ,122]:
-for idx in ["5a57542f333d180827dfc132","5a0271884e62597cdee0d0eb","5aa515e613d42d091d29d300"]:
+for idx in ["office2_sparse" ,"room1_sparse"]:
 
-    view_crafter_path = f"BMVS_PACG/diff/videos/{idx}"
-    colmap_path = f"BMVS_PACG/diff/{idx}"
-    colmap_moban_path = "BMVS_PACG/diff/moban"
-    ori_colmap_path = f"BMVS_PACG/diff_origin/{idx}"
+    view_crafter_path = f"Replica/diff/videos/{idx}"
+    colmap_path = f"Replica/diff/{idx}"
+    colmap_moban_path = "Replica/diff/moban"
+    ori_colmap_path = f"Replica/replica_gsicpslam/{idx}"
     # check_mkdir(colmap_path)
 
     copy_folder(colmap_moban_path,colmap_path)
 
-    diff_video_path = os.path.join(view_crafter_path,"diffusion_filtered.mp4")
+    diff_video_path = os.path.join(view_crafter_path,"diffusion.mp4")
     images_txt_path = os.path.join(view_crafter_path,"images_inter.txt")
-    dust3r_pcd_path = os.path.join(view_crafter_path,"pcd_filtered.ply")
+    dust3r_pcd_path = os.path.join(view_crafter_path,"pcd.ply")
 
     colmap_images_path = os.path.join(colmap_path,"images")
     MP42PNG(diff_video_path,colmap_images_path)
@@ -96,9 +96,6 @@ for idx in ["5a57542f333d180827dfc132","5a0271884e62597cdee0d0eb","5aa515e613d42
     shutil.copy(images_txt_path,os.path.join(colmap_path,"sparse","model","images.txt"))
     print("colmap位姿复制完成")
 
-    shutil.copy(os.path.join(ori_colmap_path,"sparse","0","cameras.txt"),os.path.join(colmap_path,"sparse","model","cameras.txt"))
-    print("colmap相机复制完成")
-
     os.chdir(colmap_path)
     if os.path.exists("database.db"):
         os.remove("database.db")
@@ -114,12 +111,11 @@ for idx in ["5a57542f333d180827dfc132","5a0271884e62597cdee0d0eb","5aa515e613d42
     current_colmap_images_path=os.path.join(current_colmap_path,"images")
     current_colmap_depth_path=os.path.join(current_colmap_path,"depth_npy_all")
 
-    os.chdir("/home/zhaoyibin/3DRE/cv/Marigold")
+    os.chdir("/home/zhaoyibin/3DRE/Marigold")
     py_path = "/home/zhaoyibin/anaconda3/envs/fatesgs/bin/python"
     check_mkdir(current_colmap_depth_path)
-    os.system(f"{py_path} run.py --input_rgb_dir {current_colmap_images_path} --output_dir {current_colmap_depth_path} --scale 1" )
+    os.system(f"{py_path} run.py --input_rgb_dir {current_colmap_images_path} --output_dir {current_colmap_depth_path}")
     os.chdir(current_path)
 
     copy_folder(os.path.join(colmap_path,"depth_npy_all","depth_npy"),os.path.join(colmap_path,"depth_npy"))
-
 

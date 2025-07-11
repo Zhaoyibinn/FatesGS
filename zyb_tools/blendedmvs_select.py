@@ -13,10 +13,11 @@ sys.path.append(parent_dir)
 from scene.colmap_loader import *
 
 origin_path = "BMVS_colmap/BlendedMVS-colmap"
-output_path = "BMVS_colmap/diff_origin"
-dir_name = ["5aa235f64a17b335eeaf9609","5a69c47d0d5d0a7f3b2e9752","5a6464143d809f1d8208c43c","59338e76772c3e6384afbb15","5947b62af1b45630bd0c2a02"]
-img_diff = [[11,2,25],[23,62,21],[55,61,73],[24,65,169],[11,13,67]]
-
+output_path = "BMVS_PACG/selected"
+# dir_name = ["5aa235f64a17b335eeaf9609","5a69c47d0d5d0a7f3b2e9752","5a6464143d809f1d8208c43c","59338e76772c3e6384afbb15","5947b62af1b45630bd0c2a02"]
+# img_diff = [[11,2,25],[23,62,21],[55,61,73],[24,65,169],[11,13,67]]
+dir_name = ["5a57542f333d180827dfc132","5b950c71608de421b1e7318f","5b4933abf2b5f44e95de482a","5b22269758e2823a67a3bd03","5ba19a8a360c7c30c1c169df","5bccd6beca24970bce448134","5bce7ac9ca24970bce4934b6","5be47bf9b18881428d8fbc1d"]
+img_diff = [[1,2,14],[11,13,15],[9,11,20],[5,7,8],[0,3,11],[4,7,14],[9,23,28],[4,5,29]]
 for idx,dir_name1 in enumerate(dir_name):
     img_diff1 = img_diff[idx]
     bin_path = os.path.join(origin_path,dir_name1,"sparse/0/images.bin")

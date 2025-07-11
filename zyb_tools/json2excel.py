@@ -5,9 +5,9 @@ import os
 def custom_sort_key(x):
     return int(x[3:]) 
 
-allsense = [24 ,37, 40, 55,63, 65 ,69 ,83 ,97 ,105 ,106 ,110 ,114 ,118 ,122]
-root_path_dir = "pilianghua_out_new"
-excel_file = "test_new.xlsx"
+allsense = ["office0_sparse","office1_sparse","office2_sparse","room0_sparse","room1_sparse"]
+root_path_dir = "pilianghua_out_new_rep"
+excel_file = "test_new_rep.xlsx"
 
 # main_columns = ["origin", "dust3r","dust3r_abs","dust3r_abs_trim","dust3r_abs_trim_splitmix","dust3r_abs_trim_splitmix_mvs_filter","abs_metric","abs_trim","abs_trim_splitmix","trim","abs_diff","abs_trim_diff","abs_trim_splitmix_diff","dust3r_abs_diff",]
 main_columns = os.listdir(root_path_dir)
@@ -22,7 +22,7 @@ for i in main_columns:
     all_data = []
     root_path = os.path.join(root_path_dir,i)
     for sense_idx in allsense:
-        sense = "dtu"+str(sense_idx)
+        sense = str(sense_idx)
         json_file = os.path.join(root_path,sense,"results.json")
         # "pilianghua_output/origin/dtu37/results.json"
         

@@ -158,7 +158,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
     print(f"检测到原本训练视角 {len(scene.getTrainCameras())}")
-    print(f"检测到扩散模型训练视角 {len(scene.getTrainCameras_diff())}")
+    if args.diff:
+        print(f"检测到扩散模型训练视角 {len(scene.getTrainCameras_diff())}")
     with open(config_save_path, 'w') as f:
         json.dump(train_config, f)
     all_cameras = scene.getTrainCameras().copy()
@@ -375,8 +376,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
                     if opt.split == "ordinary":
-                        gaussians.densify_and_prune(opt.densify_grad_threshold, opt.densify_grad_abs_threshold, 0.005, scene.cameras_extent, size_threshold,opt.absgs)
-
+                        gaussians.densify_and_prune(opt.densify_grad_threshold, opt.densify_grad_abs_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold,opt.absgs)
+                        # gaussians.densify_and_prune(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold)
                     elif opt.split == "scale":
                         scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
                         gaussians.densify_and_scale_split(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, opt.max_screen_size, opt.densify_scale_factor, scene_mask, N=3, no_grad=True)
@@ -388,7 +389,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         grads_abs[grads_abs.isnan()] = 0.0
                         gaussians.densify_and_clone(grads, opt.densify_grad_threshold, scene.cameras_extent)
                         if opt.absgs:
-                            gaussians.densify_and_split(grads_abs, opt.densify_grad_abs_threshold, scene.cameras_extent)
+                            gaussians.densify_and_split_absorigin(grads, opt.densify_grad_threshold,grads_abs, opt.densify_grad_abs_threshold, scene.cameras_extent)
                         else:
                             gaussians.densify_and_split(grads, opt.densify_grad_threshold, scene.cameras_extent)
 
@@ -463,6 +464,7 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
             if config['cameras'] and len(config['cameras']) > 0:
                 l1_test = 0.0
                 psnr_test = 0.0
+                ssim_test = 0.0
                 for idx, viewpoint in enumerate(config['cameras']):
                     render_pkg = renderFunc(viewpoint, scene.gaussians, *renderArgs)
                     image = torch.clamp(render_pkg["render"], 0.0, 1.0)
@@ -499,10 +501,28 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                         gt_image = gt_image.view(3, -1)[:, object_mask]
                     l1_test += l1_loss(image, gt_image).mean().double()
                     psnr_test += psnr(image, gt_image).mean().double()
-
+                    ssim_test += ssim(image, gt_image).mean().double()
                 psnr_test /= len(config['cameras'])
                 l1_test /= len(config['cameras'])
+                ssim_test /= len(config['cameras'])
                 print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
+                save_path = os.path.join(scene.model_path,"iter_test_result.json")
+                if iteration == 1:
+                    if os.path.exists(save_path):
+                        os.remove(save_path)
+                        print(f"已删除文件: {save_path}")
+                    with open(save_path, 'w', encoding='utf-8') as f:
+                        json.dump({}, f, ensure_ascii=False, indent=2)
+
+                with open(save_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                data[iteration] = {}
+                data[iteration][f"psnr"] = psnr_test.item()
+                data[iteration][f"ssim"] = ssim_test.item()
+                data[iteration][f"l1"] = l1_test.item()
+
+                with open(save_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
                 if tb_writer:
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
@@ -518,7 +538,7 @@ if __name__ == "__main__":
     parser.add_argument('--ip', type=str, default="127.0.0.1")
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[3000,5000,10000, 15_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[1,3000,5000,10000, 15_000])
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[1,1000,3_000, 15_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])

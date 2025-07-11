@@ -17,6 +17,8 @@ from tqdm import tqdm
 from utils.render_utils import save_img_f32, save_img_u8
 from functools import partial
 import open3d as o3d
+import matplotlib.pyplot as plt
+import cv2
 
 def post_process_mesh(mesh, cluster_to_keep=1000):
     """
@@ -82,7 +84,7 @@ class GaussianExtractor(object):
         self.depthmaps = []
         # self.alphamaps = []
         self.rgbmaps = []
-        # self.normals = []
+        self.normals = []
         self.depth_normals = []
         self.viewpoint_stack = []
 
@@ -104,7 +106,7 @@ class GaussianExtractor(object):
             self.rgbmaps.append(rgb.cpu())
             self.depthmaps.append(depth.cpu())
             # self.alphamaps.append(alpha.cpu())
-            # self.normals.append(normal.cpu())
+            self.normals.append(normal.cpu())
             self.depth_normals.append(depth_normal.cpu())
 
         # self.rgbmaps = torch.stack(self.rgbmaps, dim=0)
@@ -286,5 +288,8 @@ class GaussianExtractor(object):
             save_img_u8(gt.permute(1,2,0).cpu().numpy(), os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
             save_img_u8(self.rgbmaps[idx].permute(1,2,0).cpu().numpy(), os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
             save_img_f32(self.depthmaps[idx][0].cpu().numpy(), os.path.join(vis_path, 'depth_{0:05d}'.format(idx) + ".tiff"))
-            # save_img_u8(self.normals[idx].permute(1,2,0).cpu().numpy() * 0.5 + 0.5, os.path.join(vis_path, 'normal_{0:05d}'.format(idx) + ".png"))
+            save_img_u8(self.normals[idx].permute(1,2,0).cpu().numpy() * 0.5 + 0.5, os.path.join(vis_path, 'normal_{0:05d}'.format(idx) + ".png"))
+
+            # save_img_u8(self.depthmaps[idx][0].cpu().numpy() * 50 / 255, os.path.join(vis_path, 'depthvis_{0:05d}'.format(idx) + ".png"))
+            cv2.imwrite(os.path.join(vis_path, 'depthvis_{0:05d}'.format(idx) + ".png"), cv2.applyColorMap(np.uint8(np.clip(self.depthmaps[idx][0].cpu().numpy() * 70,0,255)), cv2.COLORMAP_JET))
             # save_img_u8(self.depth_normals[idx].permute(1,2,0).cpu().numpy() * 0.5 + 0.5, os.path.join(vis_path, 'depth_normal_{0:05d}'.format(idx) + ".png"))
