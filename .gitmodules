@@ -7,3 +7,9 @@
 [submodule "submodules/2DGS-AbsGS-diff-gaussian-rasterization"]
 	path = submodules/2DGS-AbsGS-diff-gaussian-rasterization
 	url = https://github.com/hjh530/2DGS-AbsGS-diff-gaussian-rasterization.git
+[submodule "submodules/vggt"]
+	path = submodules/vggt
+	url = https://github.com/Zhaoyibinn/ViewCrafter.git
+[submodule "submodules/TCNN/tiny-cuda-nn"]
+	path = submodules/TCNN/tiny-cuda-nn
+	url = https://github.com/Zhaoyibinn/tiny-cuda-nn.git
