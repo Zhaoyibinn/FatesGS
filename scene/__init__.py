@@ -49,6 +49,9 @@ class Scene:
         self.train_cameras_diff = {}
         self.test_cameras = {}
 
+        if not os.path.exists(os.path.join(args.source_path, "depth_all")):
+            os.system(f"python submodules/Marigold/run.py --input_rgb_dir {os.path.join(args.source_path, 'images')} --output_dir {os.path.join(args.source_path, 'depth_all')} --scale {args.resolution}")
+            os.system(f"cp -r {os.path.join(args.source_path, 'depth_all','depth_npy')} {os.path.join(args.source_path,'depth_npy')} ")
         if os.path.exists(os.path.join(args.source_path, "sparse")):
             scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval, args)
         elif os.path.exists(os.path.join(args.source_path, "transforms_train.json")):
