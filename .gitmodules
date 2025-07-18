@@ -13,3 +13,6 @@
 [submodule "submodules/TCNN/tiny-cuda-nn"]
 	path = submodules/TCNN/tiny-cuda-nn
 	url = https://github.com/Zhaoyibinn/tiny-cuda-nn.git
+[submodule "submodules/Marigold"]
+	path = submodules/Marigold
+	url = https://github.com/Zhaoyibinn/Marigold.git
