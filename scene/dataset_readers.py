@@ -540,8 +540,11 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
     txt_path = os.path.join(path, "sparse/0/points3D.txt")
 
 
-
-    train_cam_infos,train_cam_infos_diff,nerf_normalization,nerf_normalization_diff = load_cameras_poses( os.path.join(path, "sparse/0"),args)
+    if args.vggt:
+        train_cam_infos_images_names = os.listdir(os.path.join(path,"images"))
+        train_cam_infos_images = [os.path.join(path,"images",s) for s in train_cam_infos_images_names]
+    else:
+        train_cam_infos,train_cam_infos_diff,nerf_normalization,nerf_normalization_diff = load_cameras_poses( os.path.join(path, "sparse/0"),args)
     test_cam_infos = []
     # print("在训练过程中采用训练集进行测试")
 
@@ -625,7 +628,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
             print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
             ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
         elif args.vggt:
-            img_path_list = [train_cam_info.image_path for train_cam_info in train_cam_infos]
+            img_path_list = train_cam_infos_images
             if not args.render:
                 VGGT_model.load_data(img_path_list)
 
