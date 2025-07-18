@@ -32,6 +32,8 @@ import sys
 sys.path.append("submodules/Viewcrafter")
 sys.path.append("submodules/Viewcrafter/extern/dust3r")
 
+sys.path.append("submodules/vggt")
+
 
 import os
 import cv2
@@ -40,6 +42,7 @@ import numpy as np
 import torch
 
 from Dust3r_class import Dust3r
+from vggt_class import vggt
 
 
 
@@ -439,7 +442,11 @@ def fetchPly(path):
     vertices = plydata['vertex']
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
     colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
-    normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
+    try:
+        normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
+    except:
+        print("No normals found in PLY file")
+        normals = np.zeros_like(positions)  # If no normals, create zero normals
     return BasicPointCloud(points=positions, colors=colors, normals=normals)
 
 def storePly(path, xyz, rgb):
@@ -475,59 +482,121 @@ def topk_(matrix, K, axis=1):
         topk_data_sort = topk_data[column_index, topk_index_sort]
         topk_index_sort = topk_index[:,0:K][column_index,topk_index_sort]
     return topk_data_sort
+    
 
-def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
-    if args.dust3r:
-        Dust3r_model = Dust3r()
+def load_cameras_poses(root_path,args):
     try:
-        cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
-        cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
+        cameras_extrinsic_file = os.path.join(root_path, "images.bin")
+        cameras_intrinsic_file = os.path.join(root_path, "cameras.bin")
         cam_extrinsics = read_extrinsics_binary(cameras_extrinsic_file)
         cam_intrinsics = read_intrinsics_binary(cameras_intrinsic_file)
     except:
-        cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.txt")
-        cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.txt")
+        cameras_extrinsic_file = os.path.join(root_path, "images.txt")
+        cameras_intrinsic_file = os.path.join(root_path, "cameras.txt")
         cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
         cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
 
-    reading_dir = "images" if images == None else images
-    read_mask = True if os.path.exists(os.path.join(path, "mask")) else False
-    cam_infos_unsorted = readColmapCameras(path=path, cam_extrinsics=cam_extrinsics,
+    reading_dir = "images"
+
+    root_root_path = root_path.rsplit("/",2)[0]
+    read_mask = True if os.path.exists(os.path.join(root_root_path, "mask")) else False
+    cam_infos_unsorted = readColmapCameras(path=root_root_path, cam_extrinsics=cam_extrinsics,
                                            cam_intrinsics=cam_intrinsics,
-                                           images_folder=os.path.join(path, reading_dir),
+                                           images_folder=os.path.join(root_root_path, reading_dir),
                                            read_mask=read_mask, args=args)
     cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
 
     if args.diff:
-        cam_infos_unsorted_diff = readColmapCameras_diff(path=path, cam_extrinsics=cam_extrinsics,
+        cam_infos_unsorted_diff = readColmapCameras_diff(path=root_root_path, cam_extrinsics=cam_extrinsics,
                                             cam_intrinsics=cam_intrinsics,
-                                            images_folder=os.path.join(path, reading_dir),
+                                            images_folder=os.path.join(root_root_path, reading_dir),
                                             read_mask=read_mask, args=args)
         cam_infos_diff = sorted(cam_infos_unsorted_diff.copy(), key = lambda x : x.image_name)
 
 
     
 
-    if eval:
-        train_idx = [25, 22, 28, 40, 44, 48, 0, 8, 13]
-        exclude_idx = [3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 36, 37, 38, 39]
-        test_idx = [i for i in np.arange(49) if i not in train_idx + exclude_idx]
-        train_idx = train_idx[:n_views]
-        train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx in train_idx]
-        test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx in test_idx]
-    else:
-        train_cam_infos = cam_infos
-        test_cam_infos = []
-        if args.diff:
-            train_cam_infos_diff = cam_infos_diff
+
+    train_cam_infos = cam_infos
+    test_cam_infos = []
+    train_cam_infos_diff = None
+    if args.diff:
+        train_cam_infos_diff = cam_infos_diff
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
+
+    nerf_normalization_diff = None
     if args.diff:
         nerf_normalization_diff = getNerfppNorm(train_cam_infos_diff)
+
+    return train_cam_infos,train_cam_infos_diff,nerf_normalization,nerf_normalization_diff
+
+    
+
+def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
 
     ply_path = os.path.join(path, "sparse/0/points3D.ply")
     bin_path = os.path.join(path, "sparse/0/points3D.bin")
     txt_path = os.path.join(path, "sparse/0/points3D.txt")
+
+
+
+    train_cam_infos,train_cam_infos_diff,nerf_normalization,nerf_normalization_diff = load_cameras_poses( os.path.join(path, "sparse/0"),args)
+    test_cam_infos = []
+    # print("在训练过程中采用训练集进行测试")
+
+    if args.dust3r:
+        Dust3r_model = Dust3r()
+    elif args.vggt:
+        VGGT_model = vggt()
+
+
+    # try:
+    #     cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
+    #     cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
+    #     cam_extrinsics = read_extrinsics_binary(cameras_extrinsic_file)
+    #     cam_intrinsics = read_intrinsics_binary(cameras_intrinsic_file)
+    # except:
+    #     cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.txt")
+    #     cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.txt")
+    #     cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
+    #     cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
+
+    # reading_dir = "images" if images == None else images
+    # read_mask = True if os.path.exists(os.path.join(path, "mask")) else False
+    # cam_infos_unsorted = readColmapCameras(path=path, cam_extrinsics=cam_extrinsics,
+    #                                        cam_intrinsics=cam_intrinsics,
+    #                                        images_folder=os.path.join(path, reading_dir),
+    #                                        read_mask=read_mask, args=args)
+    # cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
+
+    # if args.diff:
+    #     cam_infos_unsorted_diff = readColmapCameras_diff(path=path, cam_extrinsics=cam_extrinsics,
+    #                                         cam_intrinsics=cam_intrinsics,
+    #                                         images_folder=os.path.join(path, reading_dir),
+    #                                         read_mask=read_mask, args=args)
+    #     cam_infos_diff = sorted(cam_infos_unsorted_diff.copy(), key = lambda x : x.image_name)
+
+
+    
+
+    # if eval:
+    #     train_idx = [25, 22, 28, 40, 44, 48, 0, 8, 13]
+    #     exclude_idx = [3, 4, 5, 6, 7, 16, 17, 18, 19, 20, 21, 36, 37, 38, 39]
+    #     test_idx = [i for i in np.arange(49) if i not in train_idx + exclude_idx]
+    #     train_idx = train_idx[:n_views]
+    #     train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx in train_idx]
+    #     test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx in test_idx]
+    # else:
+    #     train_cam_infos = cam_infos
+    #     test_cam_infos = []
+    #     if args.diff:
+    #         train_cam_infos_diff = cam_infos_diff
+
+    # nerf_normalization = getNerfppNorm(train_cam_infos)
+    # if args.diff:
+    #     nerf_normalization_diff = getNerfppNorm(train_cam_infos_diff)
+
 
     if eval:
         ply_path = os.path.join(path, "pixelnerf/dense/fused.ply")
@@ -555,11 +624,32 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
             Dust3r_model.save_pointcloud_with_normals(filter=args.mvs_filter, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = None)
             print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
             ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
+        elif args.vggt:
+            img_path_list = [train_cam_info.image_path for train_cam_info in train_cam_infos]
+            if not args.render:
+                VGGT_model.load_data(img_path_list)
+
+                VGGT_model.run_vggt(args.resolution)
+                print(f"VGGT Cameras saved to {VGGT_model.sparse_path}")
+                print(f"VGGT pointcloud saved to {os.path.join(VGGT_model.sparse_path,'points3D.ply')}")
+                train_cam_infos_vggt,train_cam_infos_diff_vggt,nerf_normalization_vggt,nerf_normalization_diff_vggt = load_cameras_poses( os.path.join(path, VGGT_model.sparse_path),args)
+            else:
+                VGGT_model.sparse_path = os.path.join(path, "sparse/vggt")
+                train_cam_infos_vggt,train_cam_infos_diff_vggt,nerf_normalization_vggt,nerf_normalization_diff_vggt = load_cameras_poses( VGGT_model.sparse_path,args)
+
+            ply_path = os.path.join(VGGT_model.sparse_path,'points3D.ply')
+
+            train_cam_infos = train_cam_infos_vggt
+            train_cam_infos_diff = train_cam_infos_diff_vggt
+            nerf_normalization = nerf_normalization_vggt
+            nerf_normalization_diff = nerf_normalization_diff_vggt
+
+
             
         else:
             ply_path = os.path.join(path, "sparse/0/points3D_colmap.ply")
             print("直接采用colmap的结果而非其他初始化")
-            
+        
 
     if not os.path.exists(ply_path):
         print("Converting point3d.bin to .ply, will happen only the first time you open the scene.")

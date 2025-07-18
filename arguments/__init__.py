@@ -58,6 +58,8 @@ class ModelParams(ParamGroup):
         self._diff = False
         # self.origin_train = False
         self.no_dust = False
+
+        self.render = False
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):
@@ -112,6 +114,8 @@ class OptimizationParams(ParamGroup):
         self.lambda_local_pearson = 0.00
         self.lambda_pearson = 0.00
         self.dust3r = False
+        self.vggt = False
+        self.wopose = False
 
         self.not_record = True
 

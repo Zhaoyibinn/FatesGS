@@ -54,6 +54,8 @@ if __name__ == "__main__":
     gaussians = GaussianModel(dataset.sh_degree)
     dataset.dust3r = False
     dataset.mvs_filter = False
+    dataset.render = True
+    dataset.vggt = opt.vggt
     scene = Scene(dataset, gaussians, load_iteration=iteration, shuffle=False)
     bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
     background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")

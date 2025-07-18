@@ -136,6 +136,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     # dataset.origin_train = opt.origin_train
     dataset.dust3r = opt.dust3r
     dataset.mvs_filter = opt.mvs_filter
+    dataset.vggt = opt.vggt
     # dataset.normals_est = opt.normals_est
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
@@ -458,7 +459,7 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
     if iteration in testing_iterations:
         torch.cuda.empty_cache()
         validation_configs = ({'name': 'test', 'cameras' : scene.getTestCameras()},
-                              {'name': 'train', 'cameras' : [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in range(5, 30, 5)]})
+                              {'name': 'train', 'cameras' : scene.getTrainCameras()})
 
         for config in validation_configs:
             if config['cameras'] and len(config['cameras']) > 0:
@@ -495,13 +496,19 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                         if iteration == testing_iterations[0]:
                             tb_writer.add_images(config['name'] + "_view_{}/ground_truth".format(viewpoint.image_name), gt_image[None], global_step=iteration)
 
+                    # if viewpoint.gt_alpha_mask is not None:
+                    #     object_mask = (viewpoint.gt_alpha_mask > 0.5).view(-1)
+                    #     image = image.view(3, -1)[:, object_mask]
+                    #     gt_image = gt_image.view(3, -1)[:, object_mask]
                     if viewpoint.gt_alpha_mask is not None:
-                        object_mask = (viewpoint.gt_alpha_mask > 0.5).view(-1)
-                        image = image.view(3, -1)[:, object_mask]
-                        gt_image = gt_image.view(3, -1)[:, object_mask]
+                        object_mask = (viewpoint.gt_alpha_mask > 0.5)
+                        object_mask = object_mask.expand_as(image) 
+                        image = image * object_mask
+                        gt_image = gt_image * object_mask
+
                     l1_test += l1_loss(image, gt_image).mean().double()
                     psnr_test += psnr(image, gt_image).mean().double()
-                    ssim_test += ssim(image, gt_image).mean().double()
+                    ssim_test += fused_ssim(image.unsqueeze(0), gt_image.unsqueeze(0)).mean().double()
                 psnr_test /= len(config['cameras'])
                 l1_test /= len(config['cameras'])
                 ssim_test /= len(config['cameras'])
