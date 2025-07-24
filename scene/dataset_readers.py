@@ -626,6 +626,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
 
             Dust3r_model.save_pointcloud_with_normals(filter=args.mvs_filter, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = None)
             print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
+            Dust3r_model.save_dust3r_depth()
             ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
         elif args.vggt:
             img_path_list = train_cam_infos_images

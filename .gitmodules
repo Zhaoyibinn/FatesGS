@@ -16,3 +16,6 @@
 [submodule "submodules/Marigold"]
 	path = submodules/Marigold
 	url = https://github.com/Zhaoyibinn/Marigold.git
+[submodule "submodules/MVSGaussian"]
+	path = submodules/MVSGaussian
+	url = https://github.com/Zhaoyibinn/MVSGaussian.git
