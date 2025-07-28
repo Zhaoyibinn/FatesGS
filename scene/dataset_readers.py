@@ -34,6 +34,8 @@ sys.path.append("submodules/Viewcrafter/extern/dust3r")
 
 sys.path.append("submodules/vggt")
 
+sys.path.append("submodules/MVSGaussian")
+
 
 import os
 import cv2
@@ -43,6 +45,7 @@ import torch
 
 from Dust3r_class import Dust3r
 from vggt_class import vggt
+from mvsgs_class import MVSGS_init
 
 
 
@@ -548,6 +551,8 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
     test_cam_infos = []
     # print("在训练过程中采用训练集进行测试")
 
+    MVSGS_model = MVSGS_init()
+
     if args.dust3r:
         Dust3r_model = Dust3r()
     elif args.vggt:
@@ -627,7 +632,9 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
             Dust3r_model.save_pointcloud_with_normals(filter=args.mvs_filter, save_path=os.path.join(path, "sparse","0","points3D_dust3r.ply"),downsample_voxel = None)
             print(f"Dust3r pointcloud saved to {os.path.join(path, 'sparse', '0', 'points3D_dust3r.ply')}")
             Dust3r_model.save_dust3r_depth()
-            ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
+            # ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
+            ply_path = os.path.join(path, "sparse/0/points3D_dust3r_mvsgs.ply")
+            MVSGS_model.run_mvsgs_init(path,ply_save_path = ply_path)
         elif args.vggt:
             img_path_list = train_cam_infos_images
             if not args.render:
