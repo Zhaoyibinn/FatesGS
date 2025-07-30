@@ -4,24 +4,33 @@ import os
 import cv2
 import numpy as np
 import sys
+
+
 sys.path.append("submodules/Viewcrafter")
 sys.path.append("submodules/Viewcrafter/extern/dust3r")
 from Dust3r_class import Dust3r
 
 
+sys.path.append("submodules/vggt")
+from vggt_class import vggt
+
+
+
 
 class forward_model_dataset(Dataset):
-    def __init__(self, data_root):
-        self.Dust3r_model  = Dust3r()
+    def __init__(self, data_root,method="dust3r",val = False):
+        # self.Dust3r_model  = Dust3r()
+        self.VGGT_model = vggt()
         self.data_root = data_root
         self.scene_names = sorted(os.listdir(data_root))
         self.batch_data = []
+        self.dtu_val_idx = [23,24,33]
         for scene_name in self.scene_names:
             scene_path = os.path.join(self.data_root,scene_name)
             img_names = sorted(os.listdir(scene_path))
 
 
-            first = torch.arange(len(img_names) - 1, dtype=torch.long)
+            first = torch.arange(len(img_names) - 3, dtype=torch.long)
             # first = torch.arange(3 - 1, dtype=torch.long)
             second = first + 1
             pairs = torch.stack([first, second], dim=1)
@@ -36,28 +45,68 @@ class forward_model_dataset(Dataset):
             os.makedirs(os.path.join(scene_path,"dust3r"),exist_ok=True)
             for img_pair in img_pairs_idxs:
                 
-                pair_name = f"pair_{img_pair[0].item()}_{img_pair[1].item()}.pth"
-                pair_path = os.path.join(scene_path,"dust3r",pair_name)
-                if os.path.exists(pair_path):
-                    
-                    load_tensor = torch.load(pair_path)
-                    pcd0,pcd1,color0,color1 = load_tensor["pcd0"], load_tensor["pcd1"], load_tensor["color0"], load_tensor["color1"]
-                    # pass
+                if img_pair[0].item() in self.dtu_val_idx:
+                    if not val:
+                        continue
                 else:
-                    img_1_idx,img_2_idx = img_pair[0].item(),img_pair[1].item()
-                    img_1,img_2 = img_paths[img_1_idx],img_paths[img_2_idx]
-                    # self.paired_imgs_paths.append([img_1,img_2])
-                    full_out,pcd_np,align_model = self.Dust3r_model.run_only_model([img_1,img_2])
-                    pcd0,pcd1 = align_model.get_pts3d()[0].detach(),align_model.get_pts3d()[1].detach()
-                    color0,color1 = (full_out['view1']['img'].cuda().detach()+1)/2,(full_out['view2']['img'].cuda().detach()+1)/2
-                    tensors_dict = {
-                        "pcd0": pcd0,
-                        "pcd1": pcd1,
-                        "color0": color0,
-                        "color1": color1
-                        }
-                    torch.save(tensors_dict, pair_path)
-                self.batch_data.append([pcd0,pcd1,color0,color1])
+                    if val:
+                        continue
+
+                if method=="dust3r":
+                    pair_name = f"pair_{img_pair[0].item()}_{img_pair[1].item()}.pth"
+                    pair_path = os.path.join(scene_path,"dust3r",pair_name)
+                    if os.path.exists(pair_path):
+                        
+                        load_tensor = torch.load(pair_path)
+                        pcd0,pcd1,color0,color1 = load_tensor["pcd0"], load_tensor["pcd1"], load_tensor["color0"], load_tensor["color1"]
+                        # pass
+                    else:
+                        img_1_idx,img_2_idx = img_pair[0].item(),img_pair[1].item()
+                        img_1,img_2 = img_paths[img_1_idx],img_paths[img_2_idx]
+                        # self.paired_imgs_paths.append([img_1,img_2])
+                        full_out,pcd_np,align_model = self.Dust3r_model.run_only_model([img_1,img_2])
+                        pcd0,pcd1 = align_model.get_pts3d()[0].detach(),align_model.get_pts3d()[1].detach()
+                        color0,color1 = (full_out['view1']['img'].cuda().detach()+1)/2,(full_out['view2']['img'].cuda().detach()+1)/2
+                        color0 = color0.permute(2,3,1,0).squeeze()
+                        color1 = color1.permute(2,3,1,0).squeeze()
+                        tensors_dict = {
+                            "pcd0": pcd0,
+                            "pcd1": pcd1,
+                            "color0": color0,
+                            "color1": color1
+                            }
+                        torch.save(tensors_dict, pair_path)
+                    mask0,mask1 = None,None
+                    self.batch_data.append([pcd0,pcd1,color0,color1,mask0,mask1])
+                elif method=="vggt":
+                    pair_name = f"pair_{img_pair[0].item()}_{img_pair[1].item()}.pth"
+                    pair_path = os.path.join(scene_path,"vggt",pair_name)
+                    os.makedirs(os.path.join(scene_path,"vggt"),exist_ok=True)
+                    if os.path.exists(pair_path):
+                        
+                        load_tensor = torch.load(pair_path)
+                        pcd0,pcd1,color0,color1,mask0,mask1 = load_tensor["pcd0"], load_tensor["pcd1"], load_tensor["color0"], load_tensor["color1"],load_tensor["mask0"],load_tensor["mask1"]
+                        # pass
+                    else:
+                        img_1_idx,img_2_idx = img_pair[0].item(),img_pair[1].item()
+                        img_1,img_2 = img_paths[img_1_idx],img_paths[img_2_idx]
+                        points_3d,points_rgb,conf_mask = self.VGGT_model.run_only_model([img_1,img_2])
+                        points_3d,points_rgb,conf_mask = torch.tensor(points_3d),torch.tensor(points_rgb),torch.tensor(conf_mask)
+                        pcd0,pcd1 = points_3d[0],points_3d[1]
+                        color0,color1 = points_rgb[0]/255,points_rgb[1]/255
+                        mask0,mask1 = conf_mask[0],conf_mask[1]
+
+                        tensors_dict = {
+                            "pcd0": pcd0,
+                            "pcd1": pcd1,
+                            "color0": color0,
+                            "color1": color1,
+                            "mask0":mask0,
+                            "mask1":mask1,
+                            }
+                        torch.save(tensors_dict, pair_path)
+                    self.batch_data.append([pcd0,pcd1,color0,color1,mask0,mask1])
+
             
 
 

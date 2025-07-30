@@ -76,8 +76,8 @@ def render(color0,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_mod
     except:
         pass
     
-    img_height = color0.shape[-2]
-    img_width = color0.shape[-1]
+    img_height = color0.shape[0]
+    img_width = color0.shape[1]
 
     # Set up rasterization configuration
 
