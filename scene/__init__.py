@@ -105,8 +105,11 @@ class Scene:
                                                            "iteration_" + str(self.loaded_iter),
                                                            "point_cloud.ply"))
         else:
-            # self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
-            self.gaussians.load_ply(scene_info.ply_path)
+            
+            if scene_info.ply_path.rsplit('/',1)[1].split('.')[0].endswith("mvsgs"):
+                self.gaussians.load_ply(scene_info.ply_path)
+            else:
+                self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
 
     def mvs_filter(self,train_cameras):
         

@@ -28,7 +28,7 @@ def inverse_opacity_activation(x):
 
     # return xyz,features_dc,features_rest,scaling,rotation,opacity,max_radii2D
 
-def render(full_out,pc ,color,tcnn_pred, align_model,pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None,drop=False,iteration=None,record_transmittance=False):
+def render(color0,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None,drop=False,iteration=None,record_transmittance=False):
     """
     Render the scene.
 
@@ -43,7 +43,7 @@ def render(full_out,pc ,color,tcnn_pred, align_model,pipe, bg_color : torch.Tens
         features[:, :3, 0 ] = fused_color
         features[:, 3:, 1:] = 0.0
 
-        print("Number of points at initialisation : ", fused_point_cloud.shape[0])
+        # print("Number of points at initialisation : ", fused_point_cloud.shape[0])
 
         dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pc.cpu())).float().cuda()), 0.0000001)
         scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 2)
@@ -76,8 +76,8 @@ def render(full_out,pc ,color,tcnn_pred, align_model,pipe, bg_color : torch.Tens
     except:
         pass
     
-    img_height = full_out['view1']['img'].shape[-2]
-    img_width = full_out['view1']['img'].shape[-1]
+    img_height = color0.shape[-2]
+    img_width = color0.shape[-1]
 
     # Set up rasterization configuration
 
@@ -144,8 +144,8 @@ def render(full_out,pc ,color,tcnn_pred, align_model,pipe, bg_color : torch.Tens
     means3D = pc
     means2D = screenspace_points
 
-    # opacities = tcnn_pred[:,0].unsqueeze(-1)
-    # scaling = tcnn_pred[:,1:3]
+    opacities = tcnn_pred[:,0].unsqueeze(-1) - 2
+    scaling = tcnn_pred[:,1:3]-10
     rotation = tcnn_pred[:,3:7]
 
     opacity = torch.sigmoid(opacities)

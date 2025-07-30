@@ -237,12 +237,18 @@ class GaussianModel:
         features_extra = features_extra.reshape((features_extra.shape[0], 3, (self.max_sh_degree + 1) ** 2 - 1))
 
         scale_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("scale_")]
-        scale_names = sorted(scale_names, key = lambda x: int(x.split('_')[-1]))[:2]
-
+        # scale_names = sorted(scale_names, key = lambda x: int(x.split('_')[-1]))[:2]
+        scale_names = sorted(scale_names, key = lambda x: int(x.split('_')[-1]))
         scales = np.zeros((xyz.shape[0], len(scale_names)))
+        # 
         # scales = np.zeros((xyz.shape[0], 2))
         for idx, attr_name in enumerate(scale_names):
             scales[:, idx] = np.asarray(plydata.elements[0][attr_name])
+
+
+        scales = scales[:,1:]
+        scale_names = scale_names[:2]
+        # 修改为2DGS的格式
 
         rot_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("rot")]
         rot_names = sorted(rot_names, key = lambda x: int(x.split('_')[-1]))
