@@ -64,32 +64,32 @@ base_lr = 1e-3
 
 weight_decay = 1e-4
 
-optimizer = torch.optim.Adam([
-    # attention_block 使用特殊学习率
-    {'params': model.attention_block.parameters(), 'lr': attention_lr,"weight_decay": weight_decay},
+# optimizer = torch.optim.Adam([
+#     # attention_block 使用特殊学习率
+#     {'params': model.attention_block.parameters(), 'lr': attention_lr,"weight_decay": weight_decay},
     
-    # 其余所有模块使用基础学习率
-    {'params': model.encoding.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
-    # {'params': model.dinov2_feature.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
-    {'params': model.dpt_head.parameters(), 'lr': attention_lr ,"weight_decay": weight_decay},
-    {'params': model.relu.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
-    {'params': model.GS_head_fc1.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
-    {'params': model.GS_head_fc2.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
-    {'params': model.GS_head_out.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
-    {'params': model.fc_pcd.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
-    {'params': model.fc_color.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
-    {'params': model.rope.parameters(), 'lr': attention_lr ,"weight_decay": weight_decay}
-])
+#     # 其余所有模块使用基础学习率
+#     {'params': model.encoding.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+#     # {'params': model.dinov2_feature.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+#     {'params': model.dpt_head.parameters(), 'lr': attention_lr ,"weight_decay": weight_decay},
+#     {'params': model.relu.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+#     {'params': model.GS_head_fc1.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+#     {'params': model.GS_head_fc2.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+#     {'params': model.GS_head_out.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+#     {'params': model.fc_pcd.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+#     {'params': model.fc_color.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+#     {'params': model.rope.parameters(), 'lr': attention_lr ,"weight_decay": weight_decay}
+# ])
 
 
-# optimizer = torch.optim.Adam(model.parameters(), lr=0.001,weight_decay=1e-5)
+optimizer = torch.optim.Adam(model.parameters(), lr=attention_lr,weight_decay=weight_decay)
 
 
 root_path = "forawrd_model/datasets"
 vis_out_dir = "forawrd_model/vis_out"
 weight_save_dir = "forawrd_model/weights"
 method = "vggt"
-eval_epoch = 100
+eval_epoch = 10
 
 
 # dataset = forward_model_dataset(root_path,method="dust3r")
@@ -98,7 +98,7 @@ val_dataset = forward_model_dataset(root_path,method=method,val=True)
 print(f"Whole Image Pair Num: Train {len(train_dataset)}; Val {len(val_dataset)}")
 dataloader = DataLoader(
     train_dataset,
-    batch_size=1,    # 批次大小
+    batch_size=2,    # 批次大小
     shuffle=False,    # 打乱数据
     num_workers=0    
 )
@@ -131,58 +131,57 @@ os.mkdir(exp_weight_save_dir)
 
 writer = SummaryWriter(f"{exp_weight_save_dir}")
 
-def render_batch(batch_data,render_0=False):
-	pcd0,pcd1,color0,color1,mask0,mask1 = batch_data
-	pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
-	reshaped_pcd0,reshaped_pcd1 = pcd0.reshape(pcd0.shape[0] * pcd0.shape[1],pcd0.shape[2]),pcd1.reshape(pcd1.shape[0] * pcd1.shape[1],pcd1.shape[2])
+def render_batch(batch_data):
+	pcd,color,mask = batch_data
 
-	# pcd = o3d.geometry.PointCloud()
-	# pcd.points = o3d.utility.Vector3dVector(reshaped_pcd.cpu().detach().numpy())
-	# o3d.io.write_point_cloud("test.ply", pcd)
+	pcd = pcd.to(device)
+	color = color.to(device)
+	mask = mask.to(device)
 
-	reshaped_color0,reshaped_color1 = color0.reshape(color0.shape[0] * color0.shape[1],color0.shape[2]),color1.reshape(color1.shape[0] * color1.shape[1],color1.shape[2])
-	
+
+	B,I,C,H,W = pcd.shape
+	# pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
+	flattened_pcd = pcd.reshape(B,I,C,H*W)
+	flattened_color = color.reshape(B,I,C,H*W)
+
 	bg_color = [0, 0, 0]
 	background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
-	gt_rgb = color0.permute(2,0,1).unsqueeze(0).to(device)
-	# for i in range(10000):
-	# encoded_pcd = encoding(reshaped_pcd1)
-	reshaped_pcd0 = reshaped_pcd0.to(device)
-	reshaped_color0 = reshaped_color0.to(device)
-	reshaped_pcd1 = reshaped_pcd1.to(device)
-	reshaped_color1 = reshaped_color1.to(device)
+	color0 = color[:,0,:,:,:].to(device)
 
-	if not render_0:
-		render_reshaped_pcd = reshaped_pcd1
-		render_reshaped_color = reshaped_color1
+
+	# if not render_0:
+	# 	render_reshaped_pcd = reshaped_pcd1
+	# 	render_reshaped_color = reshaped_color1
 		
-	else:
-		render_reshaped_pcd = reshaped_pcd0
-		render_reshaped_color = reshaped_color0
+	# else:
+	# 	render_reshaped_pcd = reshaped_pcd0
+	# 	render_reshaped_color = reshaped_color0
 
-	gt_color = color0
+	# gt_color = color0
 
-	input = torch.cat([render_reshaped_pcd.float(), render_reshaped_color], dim=1)
-	tcnn_pred = model( input,gt_color.shape[:-1])
+	input = torch.cat([pcd, color], dim=2)
+	tcnn_pred = model( input,color0.shape[1:])
+	render_rgb_batch = []
+	gt_rgb_batch = []
+	for batch_idx in range(B):
+		render_pkg = render(color[batch_idx][0],flattened_pcd[batch_idx][0],flattened_color[batch_idx][0], tcnn_pred[batch_idx],pp, background)
 
-
-	render_pkg = render(gt_color,render_reshaped_pcd.float(),render_reshaped_color, tcnn_pred,pp, background)
-
-	render_rgb = render_pkg['render'].unsqueeze(0)
-
-	if mask0 is not None and mask1 is not None:
-		render_rgb = render_rgb * mask0.unsqueeze(0).to(device)
-		gt_rgb = gt_rgb * mask0.unsqueeze(0).to(device)
-
-	return render_rgb, gt_rgb,tcnn_pred
+		render_rgb = render_pkg['render'].unsqueeze(0)
+		
+		if mask is not None :
+			render_rgb = render_rgb * mask[batch_idx][0].unsqueeze(0).to(device)
+			gt_rgb = color0[batch_idx].unsqueeze(0) * mask[batch_idx][0].unsqueeze(0).to(device)
+		render_rgb_batch.append(render_rgb)
+		gt_rgb_batch.append(gt_rgb)
+	return torch.cat(render_rgb_batch,dim = 0), torch.cat(gt_rgb_batch,dim = 0),tcnn_pred
 
 pbar = tqdm(range(2000))
 for epoch in pbar:
 	loss_record = []
 	for batch_data in dataloader:
 
-		render_rgb, gt_rgb,_ = render_batch(batch_data,render_0=True)
+		render_rgb, gt_rgb,_ = render_batch(batch_data)
 		loss_l1 = torch.abs(render_rgb-gt_rgb).mean()
 		loss_ssim = 1.0 - fused_ssim(render_rgb, gt_rgb)
 
@@ -201,13 +200,18 @@ for epoch in pbar:
 		torch.save(model.state_dict(), os.path.join(exp_weight_save_dir,f"model_weight_{epoch}.pth"))
 
 		for batch_data in val_dataloader:
-			render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data,render_0=True)
+			render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data)
 
-			pcd0,pcd1,color0,color1,mask0,mask1 = batch_data
-			pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
-			reshaped_pcd0,reshaped_pcd1 = pcd0.reshape(pcd0.shape[0] * pcd0.shape[1],pcd0.shape[2]),pcd1.reshape(pcd1.shape[0] * pcd1.shape[1],pcd1.shape[2])
-			reshaped_color0,reshaped_color1 = color0.reshape(color0.shape[0] * color0.shape[1],color0.shape[2]),color1.reshape(color1.shape[0] * color1.shape[1],color1.shape[2])
+			pcd,color,mask = batch_data
 
+			pcd = pcd.to(device)
+			color = color.to(device)
+			mask = mask.to(device)
+
+			B,I,C,H,W = pcd.shape
+			# pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
+			flattened_pcd = pcd.reshape(B,I,C,H*W)
+			flattened_color = color.reshape(B,I,C,H*W)
 
 
 			img_vis = cv2.hconcat([cv2.cvtColor((render_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB), cv2.cvtColor((gt_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB)])
@@ -216,8 +220,8 @@ for epoch in pbar:
 			cv2.imwrite(os.path.join(exp_vis_out_dir,f"render_{epoch}_{idx}.png"),img_vis)
 			
 			
-
-			world_xyz = reshaped_pcd1
+			tcnn_pred = tcnn_pred.squeeze()
+			world_xyz = flattened_pcd[0][0].permute(1,0)
 			opacity_out = tcnn_pred[:,0].unsqueeze(-1) - 2
 			scale_out = tcnn_pred[:,1:3]-10
 			rot_out = tcnn_pred[:,3:7]

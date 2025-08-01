@@ -28,12 +28,15 @@ def inverse_opacity_activation(x):
 
     # return xyz,features_dc,features_rest,scaling,rotation,opacity,max_radii2D
 
-def render(color0,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None,drop=False,iteration=None,record_transmittance=False):
+def render(img_ori,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None,drop=False,iteration=None,record_transmittance=False):
     """
     Render the scene.
 
     Background tensor (bg_color) must be on GPU!
     """
+    color = color.permute(1,0)
+    pc = pc.permute(1,0)
+
     # pc = pc[:100000]
     if True:
         sh_degree = 0
@@ -76,8 +79,8 @@ def render(color0,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_mod
     except:
         pass
     
-    img_height = color0.shape[0]
-    img_width = color0.shape[1]
+    img_height = img_ori.shape[1]
+    img_width = img_ori.shape[2]
 
     # Set up rasterization configuration
 
@@ -147,6 +150,8 @@ def render(color0,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_mod
     opacities = tcnn_pred[:,0].unsqueeze(-1) - 2
     scaling = tcnn_pred[:,1:3]-10
     rotation = tcnn_pred[:,3:7]
+    features_dc = torch.reshape(tcnn_pred[:,7:10],(tcnn_pred[:,7:10].shape[0],-1,3))
+    features_rest = torch.reshape(tcnn_pred[:,10:],(tcnn_pred[:,10:].shape[0],-1,3))
 
     opacity = torch.sigmoid(opacities)
     scales = torch.exp(scaling)
@@ -156,11 +161,9 @@ def render(color0,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_mod
     pipe.convert_SHs_python = False
 
 
-    features_dc = torch.reshape(tcnn_pred[:,7:10],(tcnn_pred[:,7:10].shape[0],-1,3))
-    features_rest = torch.reshape(tcnn_pred[:,10:],(tcnn_pred[:,10:].shape[0],-1,3))
+
     shs = torch.cat((features_dc, features_rest), dim=1)
 
-    # colors_precomp = tcnn_pred[:,1:4]
     colors_precomp = None
     # if override_color is None:
     #     if pipe.convert_SHs_python:

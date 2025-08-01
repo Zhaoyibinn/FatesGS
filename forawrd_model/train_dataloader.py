@@ -105,7 +105,19 @@ class forward_model_dataset(Dataset):
                             "mask1":mask1,
                             }
                         torch.save(tensors_dict, pair_path)
-                    self.batch_data.append([pcd0,pcd1,color0,color1,mask0,mask1])
+
+                    pcd0 = pcd0.permute(2,0,1).unsqueeze(0)
+                    pcd1 = pcd1.permute(2,0,1).unsqueeze(0)
+                    color0 = color0.permute(2,0,1).unsqueeze(0)
+                    color1 = color1.permute(2,0,1).unsqueeze(0)
+                    mask0 = mask0.unsqueeze(0).unsqueeze(0)
+                    mask1 = mask1.unsqueeze(0).unsqueeze(0)
+
+                    pcd_batch = torch.cat([pcd0, pcd1], dim=0).float()
+                    color_batch = torch.cat([color0, color1], dim=0).float()
+                    mask_batch = torch.cat([mask0, mask1], dim=0).float()
+
+                    self.batch_data.append([pcd_batch,color_batch,mask_batch])
         del self.VGGT_model
         torch.cuda.empty_cache()
 
