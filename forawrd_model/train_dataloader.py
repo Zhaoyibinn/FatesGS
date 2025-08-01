@@ -106,6 +106,8 @@ class forward_model_dataset(Dataset):
                             }
                         torch.save(tensors_dict, pair_path)
                     self.batch_data.append([pcd0,pcd1,color0,color1,mask0,mask1])
+        del self.VGGT_model
+        torch.cuda.empty_cache()
 
             
 

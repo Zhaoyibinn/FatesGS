@@ -45,8 +45,8 @@ class Dinov2(nn.Module):
         trans_14 = transforms.Resize((patch_h * patch_size, patch_w * patch_size))
         reshape14_color = trans_14(x)
         result = self.dinov2_vits14.forward_features(reshape14_color)['x_norm_patchtokens']
-        result_reshape = result.reshape(patch_h, patch_w,result.shape[-1]).unsqueeze(0).permute(0, 3, 1, 2)
+        # result_reshape = result.reshape(patch_h, patch_w,result.shape[-1]).unsqueeze(0).permute(0, 3, 1, 2)
 
         # result_reshape_vis = (result_reshape[:,:, 0] - result_reshape[:,:, 0].min()) / (result_reshape[:,:, 0].max() - result_reshape[:,:, 0].min())
 
-        return result_reshape
+        return result,reshape14_color

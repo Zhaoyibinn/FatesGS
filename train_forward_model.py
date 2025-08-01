@@ -11,6 +11,7 @@ import open3d as o3d
 from plyfile import PlyData, PlyElement
 from torch.utils.data import Dataset, DataLoader
 import datetime
+from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from Dust3r_class import Dust3r
@@ -58,14 +59,37 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = Hash_gs_init().to(device)
 
 # optimizer = config["Adam"]
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001,weight_decay=1e-5)
+attention_lr = 2e-5
+base_lr = 1e-3
+
+weight_decay = 1e-4
+
+optimizer = torch.optim.Adam([
+    # attention_block 使用特殊学习率
+    {'params': model.attention_block.parameters(), 'lr': attention_lr,"weight_decay": weight_decay},
+    
+    # 其余所有模块使用基础学习率
+    {'params': model.encoding.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+    # {'params': model.dinov2_feature.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+    {'params': model.dpt_head.parameters(), 'lr': attention_lr ,"weight_decay": weight_decay},
+    {'params': model.relu.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+    {'params': model.GS_head_fc1.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+    {'params': model.GS_head_fc2.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+    {'params': model.GS_head_out.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+    {'params': model.fc_pcd.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+    {'params': model.fc_color.parameters(), 'lr': base_lr ,"weight_decay": weight_decay},
+    {'params': model.rope.parameters(), 'lr': attention_lr ,"weight_decay": weight_decay}
+])
+
+
+# optimizer = torch.optim.Adam(model.parameters(), lr=0.001,weight_decay=1e-5)
 
 
 root_path = "forawrd_model/datasets"
 vis_out_dir = "forawrd_model/vis_out"
 weight_save_dir = "forawrd_model/weights"
 method = "vggt"
-eval_epoch = 10
+eval_epoch = 100
 
 
 # dataset = forward_model_dataset(root_path,method="dust3r")
@@ -107,7 +131,7 @@ os.mkdir(exp_weight_save_dir)
 
 writer = SummaryWriter(f"{exp_weight_save_dir}")
 
-def render_batch(batch_data):
+def render_batch(batch_data,render_0=False):
 	pcd0,pcd1,color0,color1,mask0,mask1 = batch_data
 	pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
 	reshaped_pcd0,reshaped_pcd1 = pcd0.reshape(pcd0.shape[0] * pcd0.shape[1],pcd0.shape[2]),pcd1.reshape(pcd1.shape[0] * pcd1.shape[1],pcd1.shape[2])
@@ -124,14 +148,26 @@ def render_batch(batch_data):
 	gt_rgb = color0.permute(2,0,1).unsqueeze(0).to(device)
 	# for i in range(10000):
 	# encoded_pcd = encoding(reshaped_pcd1)
+	reshaped_pcd0 = reshaped_pcd0.to(device)
+	reshaped_color0 = reshaped_color0.to(device)
 	reshaped_pcd1 = reshaped_pcd1.to(device)
 	reshaped_color1 = reshaped_color1.to(device)
-	input = torch.cat([reshaped_pcd1.float(), reshaped_color1], dim=1)
-	
-	tcnn_pred = model( input,color0.shape[:-1])
-	
 
-	render_pkg = render(color0,reshaped_pcd1.float(),reshaped_color1, tcnn_pred,pp, background)
+	if not render_0:
+		render_reshaped_pcd = reshaped_pcd1
+		render_reshaped_color = reshaped_color1
+		
+	else:
+		render_reshaped_pcd = reshaped_pcd0
+		render_reshaped_color = reshaped_color0
+
+	gt_color = color0
+
+	input = torch.cat([render_reshaped_pcd.float(), render_reshaped_color], dim=1)
+	tcnn_pred = model( input,gt_color.shape[:-1])
+
+
+	render_pkg = render(gt_color,render_reshaped_pcd.float(),render_reshaped_color, tcnn_pred,pp, background)
 
 	render_rgb = render_pkg['render'].unsqueeze(0)
 
@@ -141,52 +177,12 @@ def render_batch(batch_data):
 
 	return render_rgb, gt_rgb,tcnn_pred
 
-for epoch in range(1000):
+pbar = tqdm(range(2000))
+for epoch in pbar:
 	loss_record = []
 	for batch_data in dataloader:
 
-	# # img1,img2 = cv2.imread("DTU/set_23_24_33/scan24/images/0000.png"), cv2.imread("DTU/set_23_24_33/scan24/images/0001.png")
-	# 	# img1,img2 = batch_data
-	# 	# img1,img2 = img1[0],img2[0]
-	# 	# imgs_list = ["DTU/set_23_24_33/scan24/images/0000.png", "DTU/set_23_24_33/scan24/images/0001.png"]
-	# 	pcd0,pcd1,color0,color1,mask0,mask1 = batch_data
-	# 	pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
-
-	# 	# full_out,pcd_np,align_model = Dust3r_model.run_only_model(imgs_list)
-
-	# 	# # pcd = full_out['pred1']['pts3d'].cuda().detach()
-	# 	# pcd0,pcd1 = align_model.get_pts3d()[0].detach(),align_model.get_pts3d()[1].detach()
-	# 	# color0,color1 = (full_out['view1']['img'].cuda().detach()+1)/2,(full_out['view2']['img'].cuda().detach()+1)/2
-		
-	# 	reshaped_pcd0,reshaped_pcd1 = pcd0.reshape(pcd0.shape[0] * pcd0.shape[1],pcd0.shape[2]),pcd1.reshape(pcd1.shape[0] * pcd1.shape[1],pcd1.shape[2])
-
-	# 	# pcd = o3d.geometry.PointCloud()
-	# 	# pcd.points = o3d.utility.Vector3dVector(reshaped_pcd.cpu().detach().numpy())
-	# 	# o3d.io.write_point_cloud("test.ply", pcd)
-
-	# 	reshaped_color0,reshaped_color1 = color0.reshape(color0.shape[0] * color0.shape[1],color0.shape[2]),color1.reshape(color1.shape[0] * color1.shape[1],color1.shape[2])
-		
-	# 	bg_color = [0, 0, 0]
-	# 	background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
-
-	# 	gt_rgb = color0.permute(2,0,1).unsqueeze(0).to(device)
-	# 	# for i in range(10000):
-	# 	# encoded_pcd = encoding(reshaped_pcd1)
-	# 	reshaped_pcd1 = reshaped_pcd1.to(device)
-	# 	reshaped_color1 = reshaped_color1.to(device)
-	# 	input = torch.cat([reshaped_pcd1.float(), reshaped_color1], dim=1)
-		
-	# 	tcnn_pred = model( input,color0.shape[:-1])
-		
-
-	# 	render_pkg = render(color0,reshaped_pcd1.float(),reshaped_color1, tcnn_pred,pp, background)
-
-	# 	render_rgb = render_pkg['render'].unsqueeze(0)
-		
-	# 	if mask0 is not None and mask1 is not None:
-	# 		render_rgb = render_rgb * mask0.unsqueeze(0).to(device)
-	# 		gt_rgb = gt_rgb * mask0.unsqueeze(0).to(device)
-		render_rgb, gt_rgb,_ = render_batch(batch_data)
+		render_rgb, gt_rgb,_ = render_batch(batch_data,render_0=True)
 		loss_l1 = torch.abs(render_rgb-gt_rgb).mean()
 		loss_ssim = 1.0 - fused_ssim(render_rgb, gt_rgb)
 
@@ -205,7 +201,7 @@ for epoch in range(1000):
 		torch.save(model.state_dict(), os.path.join(exp_weight_save_dir,f"model_weight_{epoch}.pth"))
 
 		for batch_data in val_dataloader:
-			render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data)
+			render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data,render_0=True)
 
 			pcd0,pcd1,color0,color1,mask0,mask1 = batch_data
 			pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
@@ -271,7 +267,8 @@ for epoch in range(1000):
 			idx = idx + 1
 			# print("ply saved")
 		# save_gs(gs_scene)
-	print(f"Epoch {epoch} loss = {np.array(loss_record).mean()}")
+	pbar.set_description(f"Epoch {epoch} loss = {np.array(loss_record).mean():.4f}")
+	# print(f"Epoch {epoch} loss = {np.array(loss_record).mean():.4f}")
 
 writer.close()
 
