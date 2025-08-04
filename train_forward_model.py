@@ -174,7 +174,7 @@ def render_batch(batch_data):
 	render_rgb_batch = []
 	gt_rgb_batch = []
 	for batch_idx in range(B):
-		render_pkg = render(color[batch_idx][0],flattened_pcd[batch_idx][0],flattened_color[batch_idx][0], tcnn_pred[batch_idx],pp, background)
+		render_pkg = render(color[batch_idx][0],flattened_pcd[batch_idx][1],flattened_color[batch_idx][1], tcnn_pred[batch_idx],pp, background)
 
 		render_rgb = render_pkg['render'].unsqueeze(0)
 		
@@ -204,21 +204,53 @@ for epoch in pbar:
 
 	writer.add_scalar('Loss/train', np.array(loss_record).mean(), epoch)
 
+
 	if epoch%eval_epoch == 0:
-		idx = 0
+		
 		torch.save(model.state_dict(), os.path.join(exp_weight_save_dir,f"model_weight_{epoch}.pth"))
 
-		if epoch%100 == 0:
-			render_dataloader = val_train_dataloader
-			tensor_board_dir = "val_train_data"
-		else:
-			render_dataloader = val_dataloader
-			tensor_board_dir = "val_data"
+		if epoch%(5 * eval_epoch) == 0:
+			# 如果是100轮的话就对于训练集进行评估
+			loss_record = []
+			idx = 0
+			for batch_data in val_train_dataloader:
+				idx = idx + 1
+				render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data)
+
+
+				loss_l1 = torch.abs(render_rgb-gt_rgb).mean()
+				loss_ssim = 1.0 - fused_ssim(render_rgb, gt_rgb)
+				loss = 0.8 * loss_l1 + 0.2 * loss_ssim
+				loss_record.append(loss.item())
+
+				pcd,color,mask = batch_data
+
+				pcd = pcd.to(device)
+				color = color.to(device)
+				mask = mask.to(device)
+
+				B,I,C,H,W = pcd.shape
+				# pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
+				flattened_pcd = pcd.reshape(B,I,C,H*W)
+				flattened_color = color.reshape(B,I,C,H*W)
+
+			
+				img_vis = cv2.hconcat([cv2.cvtColor((render_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB), cv2.cvtColor((gt_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB)])
+				img_vis_torch = torch.tensor(cv2.cvtColor(img_vis,cv2.COLOR_RGB2BGR)).permute(2,0,1)/255
+				writer.add_image(f'val_train_data/val_img_{idx}', img_vis_torch, global_step=epoch)
+				writer.add_scalar('Loss/val_train', np.array(loss_record).mean(), epoch)
 		
-		
-		for batch_data in render_dataloader:
+
+		loss_record = []
+		idx = 0
+		for batch_data in val_dataloader:
 			idx = idx + 1
 			render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data)
+
+			loss_l1 = torch.abs(render_rgb-gt_rgb).mean()
+			loss_ssim = 1.0 - fused_ssim(render_rgb, gt_rgb)
+			loss = 0.8 * loss_l1 + 0.2 * loss_ssim
+			loss_record.append(loss.item())
 
 			pcd,color,mask = batch_data
 
@@ -234,8 +266,8 @@ for epoch in pbar:
 			
 			img_vis = cv2.hconcat([cv2.cvtColor((render_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB), cv2.cvtColor((gt_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB)])
 			img_vis_torch = torch.tensor(cv2.cvtColor(img_vis,cv2.COLOR_RGB2BGR)).permute(2,0,1)/255
-			writer.add_image(f'{tensor_board_dir}/val_img_{idx}', img_vis_torch, global_step=epoch)
-			
+			writer.add_image(f'val_data/val_img_{idx}', img_vis_torch, global_step=epoch)
+			writer.add_scalar('Loss/val', np.array(loss_record).mean(), epoch)
 			# cv2.imwrite(os.path.join(exp_vis_out_dir,f"render_{epoch}_{idx}.png"),img_vis)
 			
 			
