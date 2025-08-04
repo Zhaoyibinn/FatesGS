@@ -19,3 +19,6 @@
 [submodule "submodules/MVSGaussian"]
 	path = submodules/MVSGaussian
 	url = https://github.com/Zhaoyibinn/MVSGaussian.git
+[submodule "forawrd_model/submodule/dinov2"]
+	path = forawrd_model/submodule/dinov2
+	url = https://github.com/Zhaoyibinn/dinov2.git

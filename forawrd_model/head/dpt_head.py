@@ -16,6 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .head_act import activate_head
 from .utils import create_uv_grid, position_grid_to_embed
+import time
 
 
 class DPTHead(nn.Module):
@@ -204,6 +205,8 @@ class DPTHead(nn.Module):
         out = []
         dpt_idx = 0
 
+        
+        start_time = time.time()
         for layer_idx in self.intermediate_layer_idx:
             x = aggregated_tokens_list[layer_idx][:, :, patch_start_idx:]
 
@@ -225,6 +228,10 @@ class DPTHead(nn.Module):
             out.append(x)
             dpt_idx += 1
 
+        # print(f"     dpt time 1 {time.time() - start_time}")
+
+        start_time = time.time()
+
         # Fuse features from multiple layers.
         out = self.scratch_forward(out)
         # Interpolate fused output to match target image resolution.
@@ -234,6 +241,8 @@ class DPTHead(nn.Module):
             mode="bilinear",
             align_corners=True,
         )
+        # print(f"     dpt time 2 {time.time() - start_time}")
+
 
         if self.pos_embed:
             out = self._apply_pos_embed(out, W, H)

@@ -1,16 +1,26 @@
-# torch==2.0.0
-# torchvision==0.15.1
-pillow==10.2.0
-typing_extensions==4.9.0
-open3d==0.18.0
-mediapy==1.1.2
-lpips==0.1.4
-scikit-image==0.21.0
-tqdm==4.66.2
-trimesh==3.23.5
-plyfile==1.0.3
-pymeshlab==2023.12.post1
-opencv-python==4.9.0.80
-# submodules/diff-surfel-rasterization
-# submodules/simple-knn
-git+https://github.com/facebookresearch/pytorch3d.git
+
+open3d
+plyfile
+tensorboard
+trimesh
+einops
+roma
+pymeshlab
+pycolmap
+huggingface_hub
+git+https://github.com/jytime/LightGlue.git#egg=lightglue
+hydra-core
+git+https://github.com/graphdeco-inria/diff-gaussian-rasterization.git
+imageio
+imgaug
+numpy==1.26.4
+opencv-python==3.4.18.65
+termcolor
+
+
+submodules/2DGS-AbsGS-diff-gaussian-rasterization
+submodules/simple-knn
+torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
+
+# https://anaconda.org/pytorch3d/pytorch3d/files
+# https://github.com/rahul-goel/fused-ssim.git

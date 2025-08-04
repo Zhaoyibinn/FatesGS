@@ -12,6 +12,7 @@ from forawrd_model.layers.rope import RotaryPositionEmbedding2D, PositionGetter
 
 
 from forawrd_model.head.dpt_head import DPTHead
+import time
 
 
 
@@ -25,22 +26,30 @@ class Hash_gs_init(nn.Module):
         self.encoding = tcnn.Encoding(3, config["encoding"])
 
         self.dinov2_feature = Dinov2(upsample=1.0)
+        
 
-        self.attention_depth = 6
+        self.attention_depth = 4
         # self.attention_block = nn.ModuleList(
         #     [Attention(self.dinov2_feature.dinov2_vits14.num_features)
         #         for _ in range(self.attention_depth)
         #     ]
         # )
         
-        self.attention_block = nn.ModuleList(
-            [Block(dim = self.dinov2_feature.dinov2_vits14.num_features * 2,num_heads=8)
+        self.attention_block_pcd = nn.ModuleList(
+            [Block(dim = self.dinov2_feature.dinov2_vits14.num_features,num_heads=8)
+                for _ in range(self.attention_depth)
+            ]
+        )
+
+        self.attention_block_color = nn.ModuleList(
+            [Block(dim = self.dinov2_feature.dinov2_vits14.num_features,num_heads=8)
                 for _ in range(self.attention_depth)
             ]
         )
         
-        self.dpt_head = DPTHead(dim_in = self.dinov2_feature.dinov2_vits14.num_features * 2)
-
+        self.dpt_head_color = DPTHead(dim_in = self.dinov2_feature.dinov2_vits14.num_features,intermediate_layer_idx=[0,1,2,3],out_channels = [128, 256, 512, 512],feature_only = True,features = 128)
+        
+        self.dpt_head_pcd = DPTHead(dim_in = self.dinov2_feature.dinov2_vits14.num_features,intermediate_layer_idx=[0,1,2,3],out_channels = [128, 256, 512, 512],feature_only = True,features = 128)
 
         self.relu = nn.ReLU()
 
@@ -49,7 +58,7 @@ class Hash_gs_init(nn.Module):
         self.GS_head_out = nn.Linear(64, 19)
 
         self.fc_pcd = LinearReLU(config["encoding"]['n_levels'] * config["encoding"]['n_features_per_level'], 32)
-        self.fc_attention = LinearReLU(self.dpt_head.out_channels[0]//2 * 2, 128)
+        self.fc_attention = LinearReLU(128 *2  * 2, 128)
 
         self.rope = RotaryPositionEmbedding2D(frequency=1000)
         self.position_getter = PositionGetter() if self.rope is not None else None
@@ -85,14 +94,27 @@ class Hash_gs_init(nn.Module):
 
         dinov2_feature = torch.cat([dinov2_feature_pcd,dinov2_feature_color],dim=-1)
 
-        attention_tokens = dinov2_feature
-        attention_tokens_list = []
+        start_time = time.time()
+        attention_tokens = dinov2_feature_color
+        attention_tokens_list_color = []
         for attention_idx in range(self.attention_depth):
-            attention_tokens = self.attention_block[attention_idx](attention_tokens,pos)
-            attention_tokens_list.append(attention_tokens)
+            attention_tokens = self.attention_block_color[attention_idx](attention_tokens,pos)
+            attention_tokens_list_color.append(attention_tokens)
 
-            
-        dpt_out = self.dpt_head(attention_tokens_list,reshape14_color.reshape(B ,S, int(C_in/2) ,H, W),0)
+        attention_tokens = dinov2_feature_pcd
+        attention_tokens_list_pcd = []
+        for attention_idx in range(self.attention_depth):
+            attention_tokens = self.attention_block_color[attention_idx](attention_tokens,pos)
+            attention_tokens_list_pcd.append(attention_tokens)
+
+
+        
+        # print(f"attention time {time.time() - start_time}")
+        
+        start_time = time.time()
+        dpt_out_color = self.dpt_head_color(attention_tokens_list_color,reshape14_color.reshape(B ,S, int(C_in/2) ,H, W),0)
+        dpt_out_pcd = self.dpt_head_pcd(attention_tokens_list_pcd,reshape14_color.reshape(B ,S, int(C_in/2) ,H, W),0)
+        # print(f"dpt time {time.time() - start_time}")
         # dpt_out_feature,dpt_out_conf = dpt_out[0],dpt_out[1]
         # reshape_dinov2_feature = F.interpolate(
         #                             dinov2_feature,
@@ -101,8 +123,10 @@ class Hash_gs_init(nn.Module):
         #                             align_corners=False  # 边缘对齐参数
         #                         )
         
-        flatten_dpt_out = dpt_out.reshape(-1 ,B * H * W).permute(1,0)
+        flatten_dpt_out_color = dpt_out_color.reshape(-1 ,B * H * W).permute(1,0)
+        flatten_dpt_out_pcd = dpt_out_pcd.reshape(-1 ,B * H * W).permute(1,0)
 
+        flatten_dpt_out = torch.cat([flatten_dpt_out_color,flatten_dpt_out_pcd],dim = 1)
         # flatten_dpt_out = dpt_out.reshape(B, S, -1 ,H * W)
         # result_reshape_vis = (dinov2_feature[:,:, 0] - dinov2_feature[:,:, 0].min()) / (dinov2_feature[:,:, 0].max() - dinov2_feature[:,:, 0].min())
 

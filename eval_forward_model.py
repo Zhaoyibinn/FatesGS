@@ -27,7 +27,7 @@ from argparse import ArgumentParser, Namespace
 import tinycudann as tcnn
 
 from forawrd_model.train_dataloader import forward_model_dataset
-from forawrd_model.model import Hash_gs_init
+from forawrd_model.model_attention import Hash_gs_init
 
 
 def save_gs(gs_scene):

@@ -30,7 +30,8 @@ from fused_ssim import fused_ssim
 import tinycudann as tcnn
 
 from forawrd_model.train_dataloader import forward_model_dataset
-from forawrd_model.model import Hash_gs_init
+# from forawrd_model.model_attention import Hash_gs_init
+from forawrd_model.model_cnn import Hash_gs_init
 
 
 def save_gs(gs_scene):
@@ -89,7 +90,7 @@ root_path = "forawrd_model/datasets"
 vis_out_dir = "forawrd_model/vis_out"
 weight_save_dir = "forawrd_model/weights"
 method = "vggt"
-eval_epoch = 10
+eval_epoch = 20
 
 
 # dataset = forward_model_dataset(root_path,method="dust3r")
@@ -103,12 +104,20 @@ dataloader = DataLoader(
     num_workers=0    
 )
 
+val_train_dataloader = DataLoader(
+    train_dataset,
+    batch_size=1,    # 批次大小
+    shuffle=False,    # 打乱数据
+    num_workers=0    
+)
+# 有时候拿训练集测试
 val_dataloader = DataLoader(
     val_dataset,
     batch_size=1,    # 批次大小
     shuffle=False,    # 打乱数据
     num_workers=0    
 )
+
 
 
 i = 0
@@ -199,7 +208,16 @@ for epoch in pbar:
 		idx = 0
 		torch.save(model.state_dict(), os.path.join(exp_weight_save_dir,f"model_weight_{epoch}.pth"))
 
-		for batch_data in val_dataloader:
+		if epoch%100 == 0:
+			render_dataloader = val_train_dataloader
+			tensor_board_dir = "val_train_data"
+		else:
+			render_dataloader = val_dataloader
+			tensor_board_dir = "val_data"
+		
+		
+		for batch_data in render_dataloader:
+			idx = idx + 1
 			render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data)
 
 			pcd,color,mask = batch_data
@@ -213,12 +231,15 @@ for epoch in pbar:
 			flattened_pcd = pcd.reshape(B,I,C,H*W)
 			flattened_color = color.reshape(B,I,C,H*W)
 
-
+			
 			img_vis = cv2.hconcat([cv2.cvtColor((render_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB), cv2.cvtColor((gt_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB)])
-
+			img_vis_torch = torch.tensor(cv2.cvtColor(img_vis,cv2.COLOR_RGB2BGR)).permute(2,0,1)/255
+			writer.add_image(f'{tensor_board_dir}/val_img_{idx}', img_vis_torch, global_step=epoch)
 			
-			cv2.imwrite(os.path.join(exp_vis_out_dir,f"render_{epoch}_{idx}.png"),img_vis)
+			# cv2.imwrite(os.path.join(exp_vis_out_dir,f"render_{epoch}_{idx}.png"),img_vis)
 			
+			
+			continue
 			
 			tcnn_pred = tcnn_pred.squeeze()
 			world_xyz = flattened_pcd[0][0].permute(1,0)
@@ -268,7 +289,7 @@ for epoch in pbar:
 			elements[:] = list(map(tuple, attributes))
 			el = PlyElement.describe(elements, 'vertex')
 			PlyData([el]).write(os.path.join(exp_vis_out_dir,f"GS_{epoch}_{idx}.ply"))
-			idx = idx + 1
+			
 			# print("ply saved")
 		# save_gs(gs_scene)
 	pbar.set_description(f"Epoch {epoch} loss = {np.array(loss_record).mean():.4f}")

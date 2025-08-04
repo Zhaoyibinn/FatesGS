@@ -21,7 +21,10 @@ class Dinov2(nn.Module):
     """自定义层 包含全连接层和ReLU激活函数"""
     def __init__(self,upsample = 1.0):
         super().__init__()
-        self.dinov2_vits14 = torch.hub.load('facebookresearch/dinov2', 'dinov2_vits14')
+        # self.dinov2_vits14 = torch.hub.load('facebookresearch/dinov2', 'dinov2_vits14')
+        self.dinov2_vits14 = torch.hub.load('forawrd_model/submodule/dinov2', 'dinov2_vits14', source='local', pretrained=False)
+        self.dinov2_vits14.load_state_dict(torch.load("forawrd_model/dinov2_weights/dinov2_vits14_pretrain.pth"))
+        # print("Dinov2 Loaded")
         for param in self.dinov2_vits14.parameters():
             param.requires_grad = False
             # 冻结了Dinov2的参数 不要优化
@@ -50,3 +53,33 @@ class Dinov2(nn.Module):
         # result_reshape_vis = (result_reshape[:,:, 0] - result_reshape[:,:, 0].min()) / (result_reshape[:,:, 0].max() - result_reshape[:,:, 0].min())
 
         return result,reshape14_color
+
+class ConvBnReLU(nn.Module):
+    def __init__(self, in_channels, out_channels,
+                 kernel_size=3, stride=1, pad=1,
+                 norm_act=nn.BatchNorm2d):
+        super(ConvBnReLU, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels,
+                              kernel_size, stride=stride, padding=pad, bias=False)
+        self.bn = norm_act(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+    def forward(self, x):
+        try:
+            return self.relu(self.bn(self.conv(x)))
+        except:
+            return self.relu(self.bn(self.conv(x[:,:3,:,:])))
+        
+class ConvBn(nn.Module):
+    def __init__(self, in_channels, out_channels,
+                 kernel_size=3, stride=1, pad=1,
+                 norm_act=nn.BatchNorm2d):
+        super(ConvBnReLU, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels,
+                              kernel_size, stride=stride, padding=pad, bias=False)
+        self.bn = norm_act(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+    def forward(self, x):
+        try:
+            return self.bn(self.conv(x))
+        except:
+            return self.bn(self.conv(x[:,:3,:,:]))
