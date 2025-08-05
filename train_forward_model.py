@@ -34,11 +34,9 @@ from forawrd_model.train_dataloader import forward_model_dataset
 from forawrd_model.model_cnn import Hash_gs_init
 
 
-def save_gs(gs_scene):
-	pass
 
-def inverse_sigmoid(x):
-    return torch.log(x/(1-x))
+
+
 
 
 
@@ -60,7 +58,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = Hash_gs_init().to(device)
 
 # optimizer = config["Adam"]
-attention_lr = 2e-5
+attention_lr = 2e-4
 base_lr = 1e-3
 
 weight_decay = 1e-4
@@ -86,11 +84,45 @@ weight_decay = 1e-4
 optimizer = torch.optim.Adam(model.parameters(), lr=attention_lr,weight_decay=weight_decay)
 
 
-root_path = "forawrd_model/datasets"
+root_path = "DTU/dtu_colmap"
 vis_out_dir = "forawrd_model/vis_out"
 weight_save_dir = "forawrd_model/weights"
 method = "vggt"
 eval_epoch = 20
+forawrd_index = 1
+
+
+def val_model(dataloader):
+	# 如果是100轮的话就对于训练集进行评估
+	loss_record = []
+	idx = 0
+	for batch_data in dataloader:
+		idx = idx + 1
+		render_rgb, gt_rgb,tcnn_pred,_ = render_batch(batch_data)
+
+
+		loss_l1 = torch.abs(render_rgb-gt_rgb).mean()
+		loss_ssim = 1.0 - fused_ssim(render_rgb, gt_rgb)
+		loss = 0.8 * loss_l1 + 0.2 * loss_ssim
+		loss_record.append(loss.item())
+
+		pcd,color,mask,extrinsic,intrinsic = batch_data
+
+		pcd = pcd.to(device)
+		color = color.to(device)
+		mask = mask.to(device)
+
+		B,I,C,H,W = pcd.shape
+		# pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
+		flattened_pcd = pcd.reshape(B,I,C,H*W)
+		flattened_color = color.reshape(B,I,C,H*W)
+
+	
+		img_vis = cv2.hconcat([cv2.cvtColor((render_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB), cv2.cvtColor((gt_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB)])
+		img_vis_torch = torch.tensor(cv2.cvtColor(img_vis,cv2.COLOR_RGB2BGR)).permute(2,0,1)/255
+		writer.add_image(f'val_train_data/val_img_{idx}', img_vis_torch, global_step=epoch)
+		writer.add_scalar('Loss/val_train', np.array(loss_record).mean(), epoch)
+
 
 
 # dataset = forward_model_dataset(root_path,method="dust3r")
@@ -141,7 +173,7 @@ os.mkdir(exp_weight_save_dir)
 writer = SummaryWriter(f"{exp_weight_save_dir}")
 
 def render_batch(batch_data):
-	pcd,color,mask = batch_data
+	pcd,color,mask,extrinsic,intrinsic = batch_data
 
 	pcd = pcd.to(device)
 	color = color.to(device)
@@ -170,27 +202,37 @@ def render_batch(batch_data):
 	# gt_color = color0
 
 	input = torch.cat([pcd, color], dim=2)
-	tcnn_pred = model( input,color0.shape[1:])
+	tcnn_pred = model( input[:,forawrd_index],color0.shape[1:])
 	render_rgb_batch = []
 	gt_rgb_batch = []
+	render_pkg_batch = []
 	for batch_idx in range(B):
-		render_pkg = render(color[batch_idx][0],flattened_pcd[batch_idx][1],flattened_color[batch_idx][1], tcnn_pred[batch_idx],pp, background)
+		render_pkg = render(color[batch_idx][0],flattened_pcd[batch_idx][forawrd_index],flattened_color[batch_idx][forawrd_index], tcnn_pred[batch_idx],pp, background,intrinsic[batch_idx][0])
 
 		render_rgb = render_pkg['render'].unsqueeze(0)
+
+
+		# render_rgb_cv2 = render_rgb.cpu().detach()[0].permute(1,2,0).numpy() * 255
+		# render_depth = render_pkg['surf_depth'].squeeze()
+		# render_depth_cv2 = (render_depth.cpu().detach().numpy() * 300) - 100
+		# gt_color = color0[batch_idx].cpu().detach().permute(1,2,0).numpy() * 255
+		# vis = cv2.addWeighted(render_depth_cv2, 0.5, gt_color[:,:,0], 0.5, 0)
+
+		render_pkg_batch.append(render_pkg)
 		
 		if mask is not None :
 			render_rgb = render_rgb * mask[batch_idx][0].unsqueeze(0).to(device)
 			gt_rgb = color0[batch_idx].unsqueeze(0) * mask[batch_idx][0].unsqueeze(0).to(device)
 		render_rgb_batch.append(render_rgb)
 		gt_rgb_batch.append(gt_rgb)
-	return torch.cat(render_rgb_batch,dim = 0), torch.cat(gt_rgb_batch,dim = 0),tcnn_pred
+	return torch.cat(render_rgb_batch,dim = 0), torch.cat(gt_rgb_batch,dim = 0),tcnn_pred,render_pkg_batch
 
 pbar = tqdm(range(2000))
 for epoch in pbar:
 	loss_record = []
 	for batch_data in dataloader:
 
-		render_rgb, gt_rgb,_ = render_batch(batch_data)
+		render_rgb, gt_rgb,_,_ = render_batch(batch_data)
 		loss_l1 = torch.abs(render_rgb-gt_rgb).mean()
 		loss_ssim = 1.0 - fused_ssim(render_rgb, gt_rgb)
 
@@ -208,70 +250,13 @@ for epoch in pbar:
 	if epoch%eval_epoch == 0:
 		
 		torch.save(model.state_dict(), os.path.join(exp_weight_save_dir,f"model_weight_{epoch}.pth"))
-
 		if epoch%(5 * eval_epoch) == 0:
-			# 如果是100轮的话就对于训练集进行评估
-			loss_record = []
-			idx = 0
-			for batch_data in val_train_dataloader:
-				idx = idx + 1
-				render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data)
-
-
-				loss_l1 = torch.abs(render_rgb-gt_rgb).mean()
-				loss_ssim = 1.0 - fused_ssim(render_rgb, gt_rgb)
-				loss = 0.8 * loss_l1 + 0.2 * loss_ssim
-				loss_record.append(loss.item())
-
-				pcd,color,mask = batch_data
-
-				pcd = pcd.to(device)
-				color = color.to(device)
-				mask = mask.to(device)
-
-				B,I,C,H,W = pcd.shape
-				# pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
-				flattened_pcd = pcd.reshape(B,I,C,H*W)
-				flattened_color = color.reshape(B,I,C,H*W)
+			val_model(val_train_dataloader)
+		val_model(val_dataloader)
 
 			
-				img_vis = cv2.hconcat([cv2.cvtColor((render_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB), cv2.cvtColor((gt_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB)])
-				img_vis_torch = torch.tensor(cv2.cvtColor(img_vis,cv2.COLOR_RGB2BGR)).permute(2,0,1)/255
-				writer.add_image(f'val_train_data/val_img_{idx}', img_vis_torch, global_step=epoch)
-				writer.add_scalar('Loss/val_train', np.array(loss_record).mean(), epoch)
-		
-
-		loss_record = []
-		idx = 0
-		for batch_data in val_dataloader:
-			idx = idx + 1
-			render_rgb, gt_rgb,tcnn_pred = render_batch(batch_data)
-
-			loss_l1 = torch.abs(render_rgb-gt_rgb).mean()
-			loss_ssim = 1.0 - fused_ssim(render_rgb, gt_rgb)
-			loss = 0.8 * loss_l1 + 0.2 * loss_ssim
-			loss_record.append(loss.item())
-
-			pcd,color,mask = batch_data
-
-			pcd = pcd.to(device)
-			color = color.to(device)
-			mask = mask.to(device)
-
-			B,I,C,H,W = pcd.shape
-			# pcd0,pcd1,color0,color1 = pcd0[0],pcd1[0],color0[0],color1[0]
-			flattened_pcd = pcd.reshape(B,I,C,H*W)
-			flattened_color = color.reshape(B,I,C,H*W)
-
 			
-			img_vis = cv2.hconcat([cv2.cvtColor((render_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB), cv2.cvtColor((gt_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB)])
-			img_vis_torch = torch.tensor(cv2.cvtColor(img_vis,cv2.COLOR_RGB2BGR)).permute(2,0,1)/255
-			writer.add_image(f'val_data/val_img_{idx}', img_vis_torch, global_step=epoch)
-			writer.add_scalar('Loss/val', np.array(loss_record).mean(), epoch)
-			# cv2.imwrite(os.path.join(exp_vis_out_dir,f"render_{epoch}_{idx}.png"),img_vis)
-			
-			
-			continue
+		if False:
 			
 			tcnn_pred = tcnn_pred.squeeze()
 			world_xyz = flattened_pcd[0][0].permute(1,0)

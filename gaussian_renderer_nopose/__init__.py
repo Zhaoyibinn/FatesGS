@@ -28,7 +28,7 @@ def inverse_opacity_activation(x):
 
     # return xyz,features_dc,features_rest,scaling,rotation,opacity,max_radii2D
 
-def render(img_ori,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None,drop=False,iteration=None,record_transmittance=False):
+def render(img_ori,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, intrinsic,scaling_modifier = 1.0, override_color = None,drop=False,iteration=None,record_transmittance=False):
     """
     Render the scene.
 
@@ -84,8 +84,8 @@ def render(img_ori,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_mo
 
     # Set up rasterization configuration
 
-    beishu = 777*2 / img_width
-    focal = 2892.33/beishu
+    # beishu = 777*2 / img_width
+    focal = intrinsic[0,0].item()
     # focal = 2892.33
     # focal = align_model.im_focals[0].item()
     FoVy = focal2fov(focal, img_height)
@@ -150,12 +150,18 @@ def render(img_ori,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_mo
     opacities = tcnn_pred[:,0].unsqueeze(-1) - 2
     scaling = tcnn_pred[:,1:3]-10
     rotation = tcnn_pred[:,3:7]
-    features_dc = torch.reshape(tcnn_pred[:,7:10],(tcnn_pred[:,7:10].shape[0],-1,3))
-    features_rest = torch.reshape(tcnn_pred[:,10:],(tcnn_pred[:,10:].shape[0],-1,3))
+
+
+    # features_dc = torch.reshape(tcnn_pred[:,7:10],(tcnn_pred[:,7:10].shape[0],-1,3))
+    # features_rest = torch.reshape(tcnn_pred[:,10:],(tcnn_pred[:,10:].shape[0],-1,3))
 
     opacity = torch.sigmoid(opacities)
     scales = torch.exp(scaling)
     rotations = torch.nn.functional.normalize(rotation)
+    colors_precomp = tcnn_pred[:,7:10]
+
+    # colors_precomp = torch.tensor(np.asarray(color.cpu())).float().cuda()
+
     
     cov3D_precomp = None
     pipe.convert_SHs_python = False
@@ -164,14 +170,14 @@ def render(img_ori,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_mo
 
     shs = torch.cat((features_dc, features_rest), dim=1)
 
-    colors_precomp = None
+    # colors_precomp = None
     # if override_color is None:
     #     if pipe.convert_SHs_python:
-    #         shs_view = pc.get_features.transpose(1, 2).view(-1, 3, (pc.max_sh_degree+1)**2)
-    #         dir_pp = (pc.get_xyz - viewpoint_camera.camera_center.repeat(pc.get_features.shape[0], 1))
-    #         dir_pp_normalized = dir_pp/dir_pp.norm(dim=1, keepdim=True)
-    #         sh2rgb = eval_sh(pc.active_sh_degree, shs_view, dir_pp_normalized)
-    #         colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
+            # shs_view = pc.get_features.transpose(1, 2).view(-1, 3, (pc.max_sh_degree+1)**2)
+            # dir_pp = (pc.get_xyz - viewpoint_camera.camera_center.repeat(pc.get_features.shape[0], 1))
+            # dir_pp_normalized = dir_pp/dir_pp.norm(dim=1, keepdim=True)
+            # sh2rgb = eval_sh(pc.active_sh_degree, shs_view, dir_pp_normalized)
+            # colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
     #     else:
     #         shs = pc.get_features
     # else:
@@ -198,7 +204,7 @@ def render(img_ori,pc ,color,tcnn_pred,pipe, bg_color : torch.Tensor, scaling_mo
     rendered_image, radii, allmap = rasterizer(
         means3D = means3D,
         means2D = means2D,
-        shs = shs,
+        shs = None,
         colors_precomp = colors_precomp,
         opacities = opacity,
         scales = scales,

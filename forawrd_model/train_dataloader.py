@@ -14,6 +14,8 @@ from Dust3r_class import Dust3r
 sys.path.append("submodules/vggt")
 from vggt_class import vggt
 
+from tqdm import tqdm
+
 
 
 
@@ -25,12 +27,26 @@ class forward_model_dataset(Dataset):
         self.scene_names = sorted(os.listdir(data_root))
         self.batch_data = []
         self.dtu_val_idx = [23,24,33]
-        for scene_name in self.scene_names:
-            scene_path = os.path.join(self.data_root,scene_name)
+
+        # dtu_scene_idx = [24,37,40,55,63,65,69,83,97,105,106,110,114,118,122]
+        
+        dtu_scene_idx = [24]
+
+        for scene_name in tqdm(self.scene_names):
+            scene_path = os.path.join(self.data_root,scene_name,"images")
+            tqdm.write(f"Init {scene_path}")
+
+
+            if int(scene_name.split("scan")[-1]) not in dtu_scene_idx:
+                continue
+            
+              
+            
             img_names = sorted(os.listdir(scene_path))
+            img_names = [file for file in img_names if file.lower().endswith(".png")]
 
 
-            first = torch.arange(len(img_names) - 3, dtype=torch.long)
+            first = torch.arange(len(img_names) - 1, dtype=torch.long)
             # first = torch.arange(3 - 1, dtype=torch.long)
             second = first + 1
             pairs = torch.stack([first, second], dim=1)
@@ -42,17 +58,18 @@ class forward_model_dataset(Dataset):
             # self.paired_imgs_paths = []
             
 
-            os.makedirs(os.path.join(scene_path,"dust3r"),exist_ok=True)
-            for img_pair in img_pairs_idxs:
-                
-                if img_pair[0].item() in self.dtu_val_idx:
-                    if not val:
+            
+            for img_pair in tqdm(img_pairs_idxs, desc="Runing Forward Model", leave=False):
+                if val:
+                    if not (img_pair[0].item() in self.dtu_val_idx):
                         continue
                 else:
-                    if val:
+                    if img_pair[0].item() in self.dtu_val_idx:
                         continue
 
+
                 if method=="dust3r":
+                    os.makedirs(os.path.join(scene_path,"dust3r"),exist_ok=True)
                     pair_name = f"pair_{img_pair[0].item()}_{img_pair[1].item()}.pth"
                     pair_path = os.path.join(scene_path,"dust3r",pair_name)
                     if os.path.exists(pair_path):
@@ -85,13 +102,13 @@ class forward_model_dataset(Dataset):
                     if os.path.exists(pair_path):
                         
                         load_tensor = torch.load(pair_path)
-                        pcd0,pcd1,color0,color1,mask0,mask1 = load_tensor["pcd0"], load_tensor["pcd1"], load_tensor["color0"], load_tensor["color1"],load_tensor["mask0"],load_tensor["mask1"]
+                        pcd0,pcd1,color0,color1,mask0,mask1,extrinsic_align1,intrinsic = load_tensor["pcd0"], load_tensor["pcd1"], load_tensor["color0"], load_tensor["color1"],load_tensor["mask0"],load_tensor["mask1"],load_tensor["extrinsic"],load_tensor["intrinsic"]
                         # pass
                     else:
                         img_1_idx,img_2_idx = img_pair[0].item(),img_pair[1].item()
                         img_1,img_2 = img_paths[img_1_idx],img_paths[img_2_idx]
-                        points_3d,points_rgb,conf_mask = self.VGGT_model.run_only_model([img_1,img_2])
-                        points_3d,points_rgb,conf_mask = torch.tensor(points_3d),torch.tensor(points_rgb),torch.tensor(conf_mask)
+                        points_3d,points_rgb,conf_mask,extrinsic_align1,intrinsic = self.VGGT_model.run_only_model([img_1,img_2])
+                        points_3d,points_rgb,conf_mask,extrinsic_align1,intrinsic = torch.tensor(points_3d),torch.tensor(points_rgb),torch.tensor(conf_mask),torch.tensor(extrinsic_align1),torch.tensor(intrinsic)
                         pcd0,pcd1 = points_3d[0],points_3d[1]
                         color0,color1 = points_rgb[0]/255,points_rgb[1]/255
                         mask0,mask1 = conf_mask[0],conf_mask[1]
@@ -103,6 +120,9 @@ class forward_model_dataset(Dataset):
                             "color1": color1,
                             "mask0":mask0,
                             "mask1":mask1,
+                            "extrinsic":extrinsic_align1,
+                            "intrinsic":intrinsic,
+
                             }
                         torch.save(tensors_dict, pair_path)
 
@@ -116,8 +136,10 @@ class forward_model_dataset(Dataset):
                     pcd_batch = torch.cat([pcd0, pcd1], dim=0).float()
                     color_batch = torch.cat([color0, color1], dim=0).float()
                     mask_batch = torch.cat([mask0, mask1], dim=0).float()
+                    extrinsic_batch = extrinsic_align1
+                    intrinsic_batch = intrinsic
 
-                    self.batch_data.append([pcd_batch,color_batch,mask_batch])
+                    self.batch_data.append([pcd_batch,color_batch,mask_batch,extrinsic_batch,intrinsic_batch])
         del self.VGGT_model
         torch.cuda.empty_cache()
 
