@@ -386,16 +386,31 @@ class GaussianModel:
         prune_filter = torch.cat((selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))
         self.prune_points(prune_filter)
 
-    def densify_and_split_absorigin(self,  grads_origin, grad_threshold_origin,grads, grad_threshold, scene_extent, N=2):
+    def densify_and_split_absorigin(self,  grads_origin, grad_threshold_origin,grads, grad_threshold, scene_extent, N=2,densify_rate = 1.0):
         n_init_points = self.get_xyz.shape[0]
         # Extract points that satisfy the gradient condition
+
+        n_densify = min(int(n_init_points * (1 + densify_rate) - self.get_xyz.shape[0]), self.get_xyz.shape[0])
+
         padded_grad = torch.zeros((n_init_points), device="cuda")
         padded_grad[:grads.shape[0]] = grads.squeeze()
+
+
+
+
         selected_pts_mask = torch.where(padded_grad >= grad_threshold, True, False)
         selected_pts_mask = torch.logical_and(selected_pts_mask,
                                               torch.max(self.get_scaling, dim=1).values > self.percent_dense*scene_extent)
+        
+        topk_mask = torch.zeros_like(selected_pts_mask).index_fill(
+            dim=0, index=torch.topk(grads.squeeze(), n_densify).indices, value=True)
+        selected_pts_mask = torch.logical_and(selected_pts_mask, topk_mask)
+        # DashGS 加速策略
 
         stds = self.get_scaling[selected_pts_mask].repeat(N,1)
+
+        topk_mask = torch.zeros_like(selected_pts_mask).index_fill(
+            dim=0, index=torch.topk(grads.squeeze(), n_densify).indices, value=True)
         stds = torch.cat([stds, 0 * torch.ones_like(stds[:,:1])], dim=-1)
         means = torch.zeros_like(stds)
         samples = torch.normal(mean=means, std=stds)
@@ -411,6 +426,33 @@ class GaussianModel:
 
         prune_filter = torch.cat((selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device="cuda", dtype=bool)))
         self.prune_points(prune_filter)
+
+        return (grads >= grad_threshold).sum()
+
+
+    def prune_and_densify_dash(self, max_grad, min_opacity, extent, max_screen_size, radii, densify_rate=1.0):
+        
+        # Record the current primitive number
+        cur_n_gaussian = self.get_xyz.shape[0]
+        
+        # Prune Gaussian primitives first. 
+        self.tmp_radii = radii
+        prune_mask = (self.get_opacity < min_opacity).squeeze()
+        self.prune_points(prune_mask)
+
+        # Calculate the number of Gaussians to densify.
+        n_densify = min(int(cur_n_gaussian * (1 + densify_rate) - self.get_xyz.shape[0]), self.get_xyz.shape[0])
+        grads = self.xyz_gradient_accum / self.denom
+        grads[grads.isnan()] = 0.0
+        self.densify_and_clone_topk(grads, max_grad, extent, n_densify)
+        self.densify_and_split_topk(grads, max_grad, extent, n_densify)
+        tmp_radii = self.tmp_radii
+        self.tmp_radii = None
+
+        torch.cuda.empty_cache()
+
+        # Return the number of primitives naturally densified to accumulate momentum for primitive upperbound.
+        return (grads >= max_grad).sum()
 
     def densify_and_scale_split(self, grad_threshold, min_opacity, scene_extent, max_screen_size, scale_factor, scene_mask, N=2, no_grad=False):
         assert scale_factor > 0

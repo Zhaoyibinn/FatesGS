@@ -73,6 +73,11 @@ class PipelineParams(ParamGroup):
         self.compute_cov3D_python = False
         self.depth_ratio = 0.0
         self.debug = False
+        
+        # DashGaussian parameters
+        self.resolution_mode = "const"
+        self.densify_mode = "free"
+        self.max_n_gaussian = -1
         super().__init__(parser, "Pipeline Parameters")
 
 class OptimizationParams(ParamGroup):

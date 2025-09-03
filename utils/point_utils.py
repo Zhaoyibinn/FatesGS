@@ -4,7 +4,8 @@ import open3d as o3d
 import cv2
 def depths_to_points(view, depthmap):
     c2w = (view.world_view_transform.T).inverse()
-    W, H = view.image_width, view.image_height
+    # W, H = view.image_width, view.image_height
+    W,H = depthmap.shape[2],depthmap.shape[1]
     intrins = view.intrinsic[:3, :3]
     grid_x, grid_y = torch.meshgrid(torch.arange(W, device='cuda').float(), torch.arange(H, device='cuda').float(), indexing='xy')
     points = torch.stack([grid_x, grid_y, torch.ones_like(grid_x)], dim=-1).reshape(-1, 3)

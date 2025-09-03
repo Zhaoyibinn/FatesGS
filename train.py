@@ -15,6 +15,7 @@ from random import randint
 from utils.loss_utils import l1_loss, ssim, TVLoss, get_depth_ranking_loss,local_pearson_loss,pearson_depth_loss
 from utils.feat_utils import get_feat_loss
 from utils.point_utils import depth_to_normal,depth_to_normal_dust3r
+from utils.schedule_utils import TrainingScheduler
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -33,6 +34,9 @@ from fused_ssim import fused_ssim
 from extra_model.lowpass_pt import create_lowpass_filter,apply_lowpass_filter
 import cv2
 import numpy as np
+
+# import matplotlib
+# matplotlib.use('TkAgg')
 
 
 try:
@@ -164,6 +168,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     with open(config_save_path, 'w') as f:
         json.dump(train_config, f)
     all_cameras = scene.getTrainCameras().copy()
+
+
+    # Init DashGaussian scheduler
+    scheduler = TrainingScheduler(opt, pipe, gaussians, 
+                                  [cam.original_image for cam in scene.getTrainCameras()])
+    render_scale = scheduler.get_res_scale(1)
+
+
+
     for iteration in range(first_iter, opt.iterations + 1):
         iter_start.record()
 
@@ -184,12 +197,23 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
+        gt_image = viewpoint_cam.original_image.cuda()
+        mono_depth = viewpoint_cam.mono_depth
+
+        if render_scale > 1:
+            gt_image = torch.nn.functional.interpolate(gt_image[None], scale_factor=1/render_scale, mode="bilinear", 
+                                                       recompute_scale_factor=True, antialias=True)[0]
+            mono_depth = torch.nn.functional.interpolate(mono_depth[None, None], scale_factor=1/render_scale, mode="bilinear", 
+                                                       recompute_scale_factor=True, antialias=True)[0,0]
+            
         # print(viewpoint_cam.image_name)
-        render_pkg = render(viewpoint_cam, gaussians, pipe, background,drop=opt.drop,iteration=iteration)
+        render_pkg = render(viewpoint_cam, gaussians, pipe, background,drop=opt.drop,iteration=iteration, render_size=gt_image.shape[-2:])
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], \
             render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         total_loss_diff = 0
         
+
+
         if args.diff:
         # if False:
             viewpoint_cam_diff = viewpoint_stack_diff.pop(randint(0, len(viewpoint_stack_diff)-1))
@@ -246,7 +270,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # total_loss_diff = loss_diff + dist_loss_diff + normal_loss_diff + dsmooth_loss_diff + opt.lambda_depth * depth_rank_loss_diff
             total_loss_diff = opt.lambda_diff_l1*Ll1_diff+opt.lambda_diff_ssim *SSIM_diff + opt.lambda_diff_rend_dist * dist_loss_diff + opt.lambda_diff_normal * normal_loss_diff + opt.lambda_diff_dsmooth * dsmooth_loss_diff + opt.lambda_diff_depth * depth_rank_loss_diff
             # print(opt.lambda_diff_l1,opt.lambda_diff_ssim)
-        gt_image = viewpoint_cam.original_image.cuda()
+
+
+        
         Ll1 = l1_loss(image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - fused_ssim(image.unsqueeze(0), gt_image.unsqueeze(0)))
 
@@ -272,26 +298,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         dist_loss = lambda_dist * (rend_dist).mean()
 
         surf_depth = render_pkg["surf_depth"]
-        mono_depth = viewpoint_cam.mono_depth
-        dust3r_depth_loss = 0
-        dust3_normal_loss = 0
-        if opt.dust3r:
-            dust3r_depth = torch.tensor(viewpoint_cam.dust3r_depth_resized, device="cuda").unsqueeze(0)
-            mask_dust3r = torch.tensor(viewpoint_cam.dust3r_mask_resized, device="cuda").unsqueeze(0)
-            conf_dust3r = (torch.tensor(viewpoint_cam.dust3r_conf_resized, device="cuda").unsqueeze(0) / 10).clip(0,1)
-            if opt.lambda_dust3r_normal != 0:
-                normal_dust3r = depth_to_normal_dust3r(viewpoint_cam, dust3r_depth,viewpoint_cam.dust3r_conf_resized).permute(2,0,1)
-                # cv2.imwrite("test.png",cv2.cvtColor(np.abs(np.array(normal_dust3r.permute(1,2,0).cpu())),cv2.COLOR_RGB2BGR) * 255)
+        
 
-                normal_render = render_pkg["rend_normal"]
-                normal_render = depth_to_normal(viewpoint_cam, surf_depth).permute(2,0,1)
-                normal_render[normal_dust3r == 0] = 0
-                # cv2.imwrite("test.png",np.array(normal_render.permute(1,2,0).cpu().detach()) * 255)
-                # normal_surf = render_pkg['surf_normal']
-                # normal_surf[normal_dust3r == 0] = 0
-                # dust3_normal_loss = (1 - torch.abs(((normal_render * conf_dust3r) * (normal_dust3r * conf_dust3r))).sum(dim=0))[None].mean()
-                dust3_normal_loss = (1 - torch.abs(((normal_render * conf_dust3r) * (normal_dust3r * conf_dust3r))).sum(dim=0))[None].mean()
-            # dust3r_depth_loss = get_depth_ranking_loss(surf_depth, dust3r_depth[0], mask_dust3r.bool())
+
 
             
 
@@ -326,8 +335,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # loss
         total_loss = loss + dist_loss + normal_loss + dsmooth_loss + opt.lambda_local_pearson * Local_pearson_loss+ opt.lambda_pearson * pearson_loss + \
             opt.lambda_feat * feat_loss + \
-            opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff + opt.lambda_normal_est * est_normal_loss + \
-            opt.lambda_dust3r_depth * dust3r_depth_loss + opt.lambda_dust3r_normal * dust3_normal_loss
+            opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff + opt.lambda_normal_est * est_normal_loss
 
         total_loss.backward()
 
@@ -375,6 +383,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
 
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
+                # if iteration % opt.densification_interval == 0:
+                    # print("正在debug 没有开始densify的iter")
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
                     if opt.split == "ordinary":
                         gaussians.densify_and_prune(opt.densify_grad_threshold, opt.densify_grad_abs_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold,opt.absgs)
@@ -388,15 +398,25 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         grads[grads.isnan()] = 0.0
                         grads_abs = gaussians.xyz_gradient_accum_abs / gaussians.denom
                         grads_abs[grads_abs.isnan()] = 0.0
-                        gaussians.densify_and_clone(grads, opt.densify_grad_threshold, scene.cameras_extent)
+                        # gaussians.densify_and_clone(grads, opt.densify_grad_threshold, scene.cameras_extent)
+
+                        # Apply DashGaussian primitive scheduler to control densification.
+                        densify_rate = scheduler.get_densify_rate(iteration, gaussians.get_xyz.shape[0], render_scale)
+                        print(f"Densif Rate {densify_rate}")
+                        # momentum_add = gaussians.prune_and_densify_dash(opt.densify_grad_threshold, 0.005, scene.cameras_extent, 
+                        #                                         size_threshold, radii, densify_rate=densify_rate)
                         if opt.absgs:
-                            gaussians.densify_and_split_absorigin(grads, opt.densify_grad_threshold,grads_abs, opt.densify_grad_abs_threshold, scene.cameras_extent)
+                            momentum_add = gaussians.densify_and_split_absorigin(grads, opt.densify_grad_threshold,grads_abs, opt.densify_grad_abs_threshold, scene.cameras_extent,densify_rate = densify_rate)
+                            scheduler.update_momentum(momentum_add)
+                            render_scale = scheduler.get_res_scale(iteration)
+                            
                         else:
                             gaussians.densify_and_split(grads, opt.densify_grad_threshold, scene.cameras_extent)
 
                         # gaussians.densify_and_split(grads, opt.densify_grad_threshold, scene.cameras_extent)
-                        scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
-                        gaussians.densify_and_scale_split(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, opt.max_screen_size, opt.densify_scale_factor, scene_mask, N=3, no_grad=True)
+
+                        # scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
+                        # gaussians.densify_and_scale_split(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, opt.max_screen_size, opt.densify_scale_factor, scene_mask, N=3, no_grad=True)
 
 
 

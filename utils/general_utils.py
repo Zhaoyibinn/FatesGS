@@ -30,7 +30,7 @@ def PILtoTorch(pil_image, resolution):
         return resized_image.unsqueeze(dim=-1).permute(2, 0, 1)
 
 def get_expon_lr_func(
-    lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000
+    lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000, decay_from_iter=0,
 ):
     """
     Copied from Plenoxels
@@ -61,6 +61,21 @@ def get_expon_lr_func(
         t = np.clip(step / max_steps, 0, 1)
         log_lerp = np.exp(np.log(lr_init) * (1 - t) + np.log(lr_final) * t)
         return delay_rate * log_lerp
+    
+    '''
+    LR scheduler for DashGaussian, not decay positional learning rate until reached the maximum resolution.
+    '''
+    def helper_dashgaussian(step):
+        if step < 0 or (lr_init == 0.0 and lr_final == 0.0):
+            # Disable this parameter
+            return 0.0
+        t = np.clip((step - decay_from_iter) / (max_steps - decay_from_iter), 0, 1)
+        log_lerp = np.exp(np.log(lr_init) * (1 - t) + np.log(lr_final) * t)
+        # return delay_rate * log_lerp
+        return log_lerp
+
+    return helper if decay_from_iter == 0 else helper_dashgaussian
+
 
     return helper
 

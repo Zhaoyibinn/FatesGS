@@ -16,7 +16,7 @@ from scene.gaussian_model import GaussianModel
 from utils.sh_utils import eval_sh
 from utils.point_utils import depth_to_normal
 
-def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None,drop=False,iteration=None,record_transmittance=False):
+def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None,drop=False,iteration=None,record_transmittance=False, render_size=None):
     """
     Render the scene.
 
@@ -36,8 +36,8 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
     tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
     try:
         raster_settings = GaussianRasterizationSettings(
-            image_height=int(viewpoint_camera.image_height),
-            image_width=int(viewpoint_camera.image_width),
+            image_height=int(viewpoint_camera.image_height) if render_size is None else render_size[0],
+            image_width=int(viewpoint_camera.image_width) if render_size is None else render_size[1],
             tanfovx=tanfovx,
             tanfovy=tanfovy,
             bg=bg_color,
