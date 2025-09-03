@@ -27,11 +27,15 @@ class Hash_gs_init(nn.Module):
         self.encoding_color = tcnn.Encoding(2, config["encoding"])
         self.encoding_pcd = tcnn.Encoding(3, config["encoding"])
 
-        self.feature_unet_color = Unet(in_channels = 3, base_channels  = 16)
+        self.feature_unet_color = Unet(in_channels = 3, base_channels  = 3)
         self.feature_unet_pcd = Unet(in_channels = 32, base_channels  = 16)
 
         self.unet_gs_geo_out_conv = nn.Conv2d(in_channels = 32, out_channels = 7,kernel_size = 1, stride=1)
-        self.unet_gs_color_out_conv = nn.Conv2d(in_channels = 3, out_channels = 3,kernel_size = 1, stride=1)
+        # self.unet_gs_color_out_conv = nn.Conv2d(in_channels = 3, out_channels = 3,kernel_size = 1, stride=1)
+
+        self.linear_gs_color_out_conv = nn.Sequential(LinearReLU(3,24),nn.Linear(24,3),nn.Sigmoid())
+
+
         self.unet_gs_out = LinearReLU(64, 19)
 
 
@@ -81,13 +85,14 @@ class Hash_gs_init(nn.Module):
 
         # cat_unet = torch.cat([pcd_unet,color_unet],dim = 1)
         GS_out_geo = self.unet_gs_geo_out_conv(pcd_unet)
-        # GS_out_color = self.unet_gs_color_out_conv(color_unet)
+        # GS_out_color = self.unet_gs_color_out_conv(color)
 
-        GS_out_color = color_unet
+
+        GS_out_color = self.linear_gs_color_out_conv(color.reshape(B,C_in // 2,H*W).permute(0, 2, 1)).permute(0,2,1).reshape(B,C_in // 2,H,W)
 
 
         # GS_out = torch.cat([GS_out_geo,color],dim = 1)
-        GS_out = torch.cat([GS_out_geo,GS_out_color],dim = 1)
+        GS_out = torch.cat([GS_out_geo,color],dim = 1)
 
         GS_out_flatten = GS_out.reshape(B,-1,H*W).permute(0,2,1)
 

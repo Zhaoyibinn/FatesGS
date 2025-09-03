@@ -58,7 +58,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = Hash_gs_init().to(device)
 
 # optimizer = config["Adam"]
-attention_lr = 2e-4
+attention_lr = 4e-5
 base_lr = 1e-3
 
 weight_decay = 1e-4
@@ -88,11 +88,11 @@ root_path = "DTU/dtu_colmap"
 vis_out_dir = "forawrd_model/vis_out"
 weight_save_dir = "forawrd_model/weights"
 method = "vggt"
-eval_epoch = 20
+eval_epoch = 50
 forawrd_index = 1
 
 
-def val_model(dataloader):
+def val_model(dataloader,label = "val"):
 	# 如果是100轮的话就对于训练集进行评估
 	loss_record = []
 	idx = 0
@@ -120,8 +120,8 @@ def val_model(dataloader):
 	
 		img_vis = cv2.hconcat([cv2.cvtColor((render_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB), cv2.cvtColor((gt_rgb[0].cpu().detach().numpy().transpose(1,2,0)) * 255,cv2.COLOR_BGR2RGB)])
 		img_vis_torch = torch.tensor(cv2.cvtColor(img_vis,cv2.COLOR_RGB2BGR)).permute(2,0,1)/255
-		writer.add_image(f'val_train_data/val_img_{idx}', img_vis_torch, global_step=epoch)
-		writer.add_scalar('Loss/val_train', np.array(loss_record).mean(), epoch)
+		writer.add_image(f'{label}/{label}_img_{idx}', img_vis_torch, global_step=epoch)
+		writer.add_scalar(f'Loss/{label}', np.array(loss_record).mean(), epoch)
 
 
 
@@ -167,7 +167,7 @@ now = datetime.datetime.now()
 datetime_num = now.strftime("%Y%m%d%H%M%S")
 exp_vis_out_dir = os.path.join(vis_out_dir,str(datetime_num))
 exp_weight_save_dir = os.path.join(weight_save_dir,str(datetime_num))
-os.mkdir(exp_vis_out_dir)
+# os.mkdir(exp_vis_out_dir)
 os.mkdir(exp_weight_save_dir)
 
 writer = SummaryWriter(f"{exp_weight_save_dir}")
@@ -251,7 +251,7 @@ for epoch in pbar:
 		
 		torch.save(model.state_dict(), os.path.join(exp_weight_save_dir,f"model_weight_{epoch}.pth"))
 		if epoch%(5 * eval_epoch) == 0:
-			val_model(val_train_dataloader)
+			val_model(val_train_dataloader,label="val_train")
 		val_model(val_dataloader)
 
 			

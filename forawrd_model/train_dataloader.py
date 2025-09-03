@@ -28,9 +28,9 @@ class forward_model_dataset(Dataset):
         self.batch_data = []
         self.dtu_val_idx = [23,24,33]
 
-        # dtu_scene_idx = [24,37,40,55,63,65,69,83,97,105,106,110,114,118,122]
+        dtu_scene_idx = [24,37,40,55,63,65,69,83,97,105,106,110,114,118,122]
         
-        dtu_scene_idx = [24]
+        # dtu_scene_idx = [24]
 
         for scene_name in tqdm(self.scene_names):
             scene_path = os.path.join(self.data_root,scene_name,"images")
