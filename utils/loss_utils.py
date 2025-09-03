@@ -127,6 +127,7 @@ def get_depth_ranking_loss(surf_depth, mono_depth, object_mask=None):
 
         depth_rank_loss += 0.5 * patched_depth_ranking_loss(surf_depth_crop, mono_depth_crop, patch_size=32)
 
+
     return depth_rank_loss
 
 def pearson_depth_loss(depth_src, depth_target):
