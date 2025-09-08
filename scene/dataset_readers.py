@@ -253,9 +253,9 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
         normal_path = os.path.join(normals_folder, image_name + ".png")
         normal = None
 
-        if os.path.exists(depth_path):
-            depth = np.load(depth_path)
-            depth[cv2.resize(np.array(image)[:,:,0],(depth.shape[1],depth.shape[0]),cv2.INTER_NEAREST) ==0] = 0
+        # if os.path.exists(depth_path):
+        depth = np.load(depth_path)
+        depth[cv2.resize(np.array(image)[:,:,0],(depth.shape[1],depth.shape[0]),cv2.INTER_NEAREST) ==0] = 0
             # 纯黑的地方就不要depth
         if os.path.exists(normal_path):
             normal = cv2.imread(normal_path,cv2.IMREAD_UNCHANGED)
@@ -543,7 +543,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
     txt_path = os.path.join(path, "sparse/0/points3D.txt")
 
 
-    if args.vggt:
+    if args.init == "vggt":
         train_cam_infos_images_names = os.listdir(os.path.join(path,"images"))
         train_cam_infos_images = [os.path.join(path,"images",s) for s in train_cam_infos_images_names]
     else:
@@ -553,9 +553,9 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
 
     MVSGS_model = MVSGS_init()
 
-    if args.dust3r:
+    if args.init == "dust3r":
         Dust3r_model = Dust3r()
-    elif args.vggt:
+    elif args.init == "vggt":
         VGGT_model = vggt()
 
 
@@ -609,7 +609,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
     if eval:
         ply_path = os.path.join(path, "pixelnerf/dense/fused.ply")
     else:
-        if args.dust3r:
+        if args.init == "dust3r":
             img_path_list = [train_cam_info.image_path for train_cam_info in train_cam_infos]
             if not args.diff:
                 Dust3r_model.load_data(img_path_list,sparse_colmap_path_root=os.path.join(path, "sparse","0"))
@@ -635,7 +635,7 @@ def readColmapSceneInfo(path, images, eval, args, llffhold=8, n_views=3):
             # ply_path = os.path.join(path, "sparse/0/points3D_dust3r.ply")
             ply_path = os.path.join(path, "sparse/0/points3D_dust3r_mvsgs.ply")
             MVSGS_model.run_mvsgs_init(path,ply_save_path = ply_path)
-        elif args.vggt:
+        elif args.init == "vggt":
             img_path_list = train_cam_infos_images
             if not args.render:
                 VGGT_model.load_data(img_path_list)

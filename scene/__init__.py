@@ -98,8 +98,9 @@ class Scene:
 
 
 
-
-        if self.loaded_iter:
+        if args.init == 'vggt_gs':
+            self.gaussians.load_ply(os.path.join(args.source_path,"sparse","0","points3D_GS.ply"))
+        elif self.loaded_iter:
             self.gaussians.load_ply(os.path.join(self.model_path,
                                                            "point_cloud",
                                                            "iteration_" + str(self.loaded_iter),

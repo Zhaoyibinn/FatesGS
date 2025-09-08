@@ -129,8 +129,8 @@ class OptimizationParams(ParamGroup):
         self.lambda_normal_est = 0.0
 
         self.contribution_prune_from_iter = 500
-        self.contribution_prune_interval = 500
-        self.contribution_prune_ratio = 0.1
+        self.contribution_prune_interval = 1000
+        self.contribution_prune_ratio = 0.05
         self.max_screen_size = 20
         self.densify_scale_factor = 0.3
 
@@ -144,6 +144,8 @@ class OptimizationParams(ParamGroup):
         self.absgs = False
 
         self.mvs_filter = False
+
+        self.init = "colmap"
         
         super().__init__(parser, "Optimization Parameters")
 

@@ -246,8 +246,8 @@ class GaussianModel:
             scales[:, idx] = np.asarray(plydata.elements[0][attr_name])
 
 
-        scales = scales[:,1:]
-        scale_names = scale_names[:2]
+        # scales = scales[:,1:]
+        # scale_names = scale_names[:2]
         # 修改为2DGS的格式
 
         rot_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("rot")]

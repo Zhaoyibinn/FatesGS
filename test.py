@@ -1,131 +1,29 @@
-import os
-import shutil
-import argparse
+import open3d as o3d
 
-def delete_all_except_images(folder_path):
-    """
-    遍历指定文件夹下的所有子文件夹，删除每个子文件夹中除了'images'之外的所有文件和文件夹
-    
-    Args:
-        folder_path (str): 要处理的根文件夹路径
-    """
-    # 检查文件夹是否存在
-    if not os.path.exists(folder_path):
-        print(f"错误：文件夹 '{folder_path}' 不存在")
-        return
-    
-    # 遍历根文件夹下的所有子文件夹
-    for subdir in os.listdir(folder_path):
-        subdir_path = os.path.join(folder_path, subdir)
-        
-        # 确保是文件夹而不是文件
-        if os.path.isdir(subdir_path):
-            print(f"\n处理子文件夹: {subdir}")
-            
-            # 遍历子文件夹中的所有内容
-            for item in os.listdir(subdir_path):
-                item_path = os.path.join(subdir_path, item)
-                
-                # 如果是'images'文件夹，则保留
-                if os.path.isdir(item_path) and item.lower() == 'images':
-                    print(f"  保留文件夹: {item}")
-                    continue
-                
-                # 删除其他所有文件和文件夹
-                try:
-                    if os.path.isfile(item_path) or os.path.islink(item_path):
-                        os.remove(item_path)
-                        print(f"  已删除文件: {item}")
-                    elif os.path.isdir(item_path):
-                        shutil.rmtree(item_path)
-                        print(f"  已删除文件夹: {item}")
-                except Exception as e:
-                    print(f"  删除失败 {item}: {e}")
-    
-    print("\n处理完成！")
+# 读取点云文件
+point_cloud_file = "DTU/set_23_24_33_vggt_initok/dtu_3_images_vggt/scan40/sparse/vggt/points3D.ply"  # 替换为你的点云文件路径
+point_cloud = o3d.io.read_point_cloud(point_cloud_file)
 
-def safe_delete_all_except_images(folder_path, dry_run=False):
-    """
-    安全版本：先显示将要删除的内容，需要确认后再执行
-    
-    Args:
-        folder_path (str): 要处理的根文件夹路径
-        dry_run (bool): 如果为True，只显示将要删除的内容而不实际删除
-    """
-    if not os.path.exists(folder_path):
-        print(f"错误：文件夹 '{folder_path}' 不存在")
-        return
-    
-    items_to_delete = []
-    items_to_keep = []
-    
-    # 首先收集所有要删除和保留的项目信息
-    for subdir in os.listdir(folder_path):
-        subdir_path = os.path.join(folder_path, subdir)
-        
-        if os.path.isdir(subdir_path):
-            print(f"\n检查子文件夹: {subdir}")
-            
-            for item in os.listdir(subdir_path):
-                item_path = os.path.join(subdir_path, item)
-                
-                if os.path.isdir(item_path) and item.lower() == 'images':
-                    items_to_keep.append(item_path)
-                    print(f"  将保留: {item}/ (文件夹)")
-                else:
-                    items_to_delete.append(item_path)
-                    item_type = "文件" if os.path.isfile(item_path) else "文件夹"
-                    print(f"  将删除: {item} ({item_type})")
-    
-    if not items_to_delete:
-        print("\n没有找到需要删除的项目")
-        return
-    
-    if dry_run:
-        print(f"\n干燥运行完成，共找到:")
-        print(f"  - 将保留: {len(items_to_keep)} 个项目")
-        print(f"  - 将删除: {len(items_to_delete)} 个项目")
-        return
-    
-    # 询问用户确认
-    print(f"\n总结:")
-    print(f"  - 将保留: {len(items_to_keep)} 个项目")
-    print(f"  - 将删除: {len(items_to_delete)} 个项目")
-    
-    confirmation = input("\n确认要执行删除操作吗？此操作不可逆！(y/N): ")
-    
-    if confirmation.lower() in ['y', 'yes']:
-        for item_path in items_to_delete:
-            try:
-                if os.path.isfile(item_path) or os.path.islink(item_path):
-                    os.remove(item_path)
-                    print(f"已删除文件: {os.path.basename(item_path)}")
-                elif os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-                    print(f"已删除文件夹: {os.path.basename(item_path)}")
-            except Exception as e:
-                print(f"删除失败 {os.path.basename(item_path)}: {e}")
-        print("\n处理完成！")
-    else:
-        print("操作已取消")
+# 检查点云是否加载成功
+if not point_cloud.has_points():
+    print("点云加载失败，请检查文件路径或格式。")
+    exit()
 
-def main():
-    parser = argparse.ArgumentParser(description='删除子文件夹中除了images文件夹之外的所有文件和文件夹')
-    parser.add_argument('--folder_path', help='要处理的根文件夹路径')
-    parser.add_argument('--safe', action='store_true', help='使用安全模式（会要求确认）')
-    parser.add_argument('--dry-run', action='store_true', help='只显示将要删除的内容而不实际执行')
-    
-    args = parser.parse_args()
-    
-    if args.safe or args.dry_run:
-        safe_delete_all_except_images(args.folder_path, args.dry_run)
-    else:
-        # 直接执行模式也会要求确认
-        confirmation = input("直接执行模式：确认要删除除了images之外的所有文件和文件夹吗？此操作不可逆！(y/N): ")
-        if confirmation.lower() in ['y', 'yes']:
-            delete_all_except_images(args.folder_path)
-        else:
-            print("操作已取消")
+# 使用 Alpha Shape 方法将点云转换为网格
+alpha = 0.005  # 调整 alpha 值以控制网格的细节程度
+mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(point_cloud, alpha)
 
-if __name__ == "__main__":
-    main()
+# 或者使用 Ball Pivoting 方法
+# radii = [0.005, 0.01, 0.02]  # 调整半径以控制网格生成
+# mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
+#     point_cloud, o3d.utility.DoubleVector(radii)
+# )
+
+# 平滑网格
+mesh.compute_vertex_normals()
+
+# 保存网格为文件
+mesh_file = "DTU/set_23_24_33_vggt_initok/dtu_3_images_vggt/scan40/sparse/vggt/points3D_vggt_mesh.ply"  # 替换为你想保存的文件路径
+o3d.io.write_triangle_mesh(mesh_file, mesh)
+
+print(f"网格已保存到: {mesh_file}")

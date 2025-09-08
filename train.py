@@ -139,9 +139,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
     # dataset.origin_train = opt.origin_train
-    dataset.dust3r = opt.dust3r
+    dataset.init = opt.init
     dataset.mvs_filter = opt.mvs_filter
-    dataset.vggt = opt.vggt
+    # dataset.vggt = opt.vggt
     # dataset.normals_est = opt.normals_est
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
@@ -257,6 +257,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
         gt_image = viewpoint_cam.original_image.cuda()
+        
         if render_scale > 1:
             gt_image = torch.nn.functional.interpolate(gt_image[None], scale_factor=1/render_scale, mode="bilinear", 
                                                        recompute_scale_factor=True, antialias=True)[0]
@@ -337,7 +338,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                         # Apply DashGaussian primitive scheduler to control densification.
                         densify_rate = scheduler.get_densify_rate(iteration, gaussians.get_xyz.shape[0], render_scale)
-                        print(f"Densify Rate {densify_rate}")
+                        # print(f"Densify Rate {densify_rate}")
                         # momentum_add = gaussians.prune_and_densify_dash(opt.densify_grad_threshold, 0.005, scene.cameras_extent, 
                         #                                         size_threshold, radii, densify_rate=densify_rate)
                         if opt.absgs:
@@ -452,9 +453,17 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                         image = image * object_mask
                         gt_image = gt_image * object_mask
 
-                    l1_test += l1_loss(image, gt_image).mean().double()
-                    psnr_test += psnr(image, gt_image).mean().double()
-                    ssim_test += fused_ssim(image.unsqueeze(0), gt_image.unsqueeze(0)).mean().double()
+                    gt_alpha_mask = viewpoint.gt_alpha_mask
+
+                    masked_image = image * gt_alpha_mask
+                    masked_gt_image = gt_image * gt_alpha_mask
+
+                    # l1_test += l1_loss(image, gt_image).mean().double()
+                    # psnr_test += psnr(image, gt_image).mean().double()
+                    # ssim_test += fused_ssim(image.unsqueeze(0), gt_image.unsqueeze(0)).mean().double()
+                    l1_test += l1_loss(masked_image, masked_gt_image).mean().double()
+                    psnr_test += psnr(masked_image, masked_gt_image).mean().double()
+                    ssim_test += fused_ssim(masked_image.unsqueeze(0), masked_gt_image.unsqueeze(0)).mean().double()
                 psnr_test /= len(config['cameras'])
                 l1_test /= len(config['cameras'])
                 ssim_test /= len(config['cameras'])
@@ -492,7 +501,7 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
     parser.add_argument("--test_iterations", nargs="+", type=int, default=[1,3000,5000,10000, 15_000])
-    parser.add_argument("--save_iterations", nargs="+", type=int, default=[1,1000,3_000, 15_000])
+    parser.add_argument("--save_iterations", nargs="+", type=int, default=[1,500,1000,3_000,5000,10000, 15_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
