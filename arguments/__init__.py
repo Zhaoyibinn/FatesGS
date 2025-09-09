@@ -102,7 +102,7 @@ class OptimizationParams(ParamGroup):
 
         self.densification_interval = 100
         self.opacity_reset_interval = 1000
-        self.densify_from_iter = 500
+        self.densify_from_iter = 0
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
         self.densify_grad_abs_threshold = 0.0008
@@ -128,7 +128,7 @@ class OptimizationParams(ParamGroup):
 
         self.lambda_normal_est = 0.0
 
-        self.contribution_prune_from_iter = 500
+        self.contribution_prune_from_iter = 0
         self.contribution_prune_interval = 1000
         self.contribution_prune_ratio = 0.05
         self.max_screen_size = 20
@@ -146,6 +146,8 @@ class OptimizationParams(ParamGroup):
         self.mvs_filter = False
 
         self.init = "colmap"
+
+        self.lambda_dsmooth = 1.0
         
         super().__init__(parser, "Optimization Parameters")
 

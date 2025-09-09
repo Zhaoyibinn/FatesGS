@@ -17,12 +17,12 @@ def trans_with_st(source_points,s,t):
 
 scan = 40
 input_path_2 = "DTU/set_23_24_33_vggt_initok/dtu_3_images_vggt/scan40/sparse/vggt/points3D_vggt_mesh.ply"
-input_path = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/ours_1/fuse_post.ply"
-input_path_3 = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/ours_500/fuse_post.ply"
+input_path_3 = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/ours_1/fuse_post.ply"
+input_path = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/ours_1000/fuse_post.ply"
 
 output_path_2 = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/vggt_align_culled.ply"
-output_path = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/ours_1_align_culled.ply"
-output_path_3 = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/ours_500_align_culled.ply"
+output_path_3 = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/ours_1_align_culled.ply"
+output_path = "pilianghua_out/gs_init/pilianghua_output_gsinit/scan40/train/ours_1000_align_culled.ply"
 
 input_ply = o3d.io.read_point_cloud(input_path)
 input_ply_2 = o3d.io.read_point_cloud(input_path_2)

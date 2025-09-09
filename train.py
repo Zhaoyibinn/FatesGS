@@ -173,13 +173,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     # Init DashGaussian scheduler
     scheduler = TrainingScheduler(opt, pipe, gaussians, 
-                                  [cam.original_image for cam in scene.getTrainCameras()])
+                                  [cam.original_image for cam in scene.getTrainCameras()],max_scale = 3)
+    # max scale就是dash开始时候的下采样率 注意会取int 所以本质上是-1的
     render_scale = scheduler.get_res_scale(1)
 
 
     loss_factory = LossFactory(opt, args,scene,dataset)
 
     for iteration in range(first_iter, opt.iterations + 1):
+        # print("render scale", render_scale)
         iter_start.record()
 
         gaussians.update_learning_rate(iteration)
@@ -353,10 +355,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     
                     # # gaussians.prune_large_and_transparent(0.005, 10.0)
 
-                    # TrimGS
-                    if opt.trim and iteration > opt.contribution_prune_from_iter and iteration % opt.contribution_prune_interval == 0:
-                        prune_low_contribution_gaussians(gaussians, all_cameras, pipe, background, K=5, prune_ratio=opt.contribution_prune_ratio)
-                        print(f'Num gs after contribution prune: {len(gaussians.get_xyz)}')
+                # TrimGS
+                if opt.trim and iteration == 1:
+                    prune_low_contribution_gaussians(gaussians, all_cameras, pipe, background, K=5, prune_ratio=opt.contribution_prune_ratio)
+                    print(f'Num gs after contribution prune: {len(gaussians.get_xyz)}')
+                    print(f'在初始帧修剪')
+                if opt.trim and iteration > opt.contribution_prune_from_iter and iteration % opt.contribution_prune_interval == 0:
+                    prune_low_contribution_gaussians(gaussians, all_cameras, pipe, background, K=5, prune_ratio=opt.contribution_prune_ratio)
+                    print(f'Num gs after contribution prune: {len(gaussians.get_xyz)}')
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
@@ -500,7 +506,7 @@ if __name__ == "__main__":
     parser.add_argument('--ip', type=str, default="127.0.0.1")
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[1,3000,5000,10000, 15_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[1,500,1000,3000,5000,10000, 15_000])
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[1,500,1000,3_000,5000,10000, 15_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])

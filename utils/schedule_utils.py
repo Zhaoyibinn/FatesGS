@@ -12,19 +12,20 @@ class TrainingScheduler():
 	"""
 	DashGaussian training scheduler of resolution and primitive number.
 	"""
-	def __init__(self, opt: OptimizationParams, pipe: PipelineParams, gaussians: GaussianModel, original_images: list) -> None:
+	def __init__(self, opt: OptimizationParams, pipe: PipelineParams, gaussians: GaussianModel, original_images: list,max_scale = 8) -> None:
 
+		self.max_reso_scale = max_scale
 		self.max_steps = opt.iterations
 		self.init_n_gaussian = gaussians.get_xyz.shape[0]
 
 		self.densify_mode = pipe.densify_mode
-		self.densify_until_iter = opt.densify_until_iter
+		self.densify_until_iter = 1000
 		self.densification_interval = opt.densification_interval
 
 		self.resolution_mode = pipe.resolution_mode
 
 		self.start_significance_factor = 4
-		self.max_reso_scale = 8
+		# self.max_reso_scale = 8
 		self.reso_sample_num = 32 # Must be no less than 2
 		self.max_densify_rate_per_step = 0.2
 		self.reso_scales = None
@@ -124,7 +125,7 @@ class TrainingScheduler():
 		
 		print("[ INFO ] Initializing resolution scheduler...")
 
-		self.max_reso_scale = 8
+		
 		self.next_i = 2
 		scene_freq_image = None
 		
@@ -132,7 +133,7 @@ class TrainingScheduler():
 			img_fft_centered = torch.fft.fftshift(torch.fft.fft2(img), dim=(-2, -1))
 			img_fft_centered_mod = (img_fft_centered.real.square() + img_fft_centered.imag.square()).sqrt()
 			scene_freq_image = img_fft_centered_mod if scene_freq_image is None else scene_freq_image + img_fft_centered_mod
-
+			# 就是转换到频域然后取模 相加等到场景的频谱和
 			e_total = img_fft_centered_mod.sum().item()
 			e_min = e_total / self.start_significance_factor
 			self.max_reso_scale = min(self.max_reso_scale, scale_solver(img_fft_centered_mod, e_min))

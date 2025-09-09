@@ -46,9 +46,11 @@ class LossFactory():
         loss = (1.0 - self.opt.lambda_dssim) * Ll1 + self.opt.lambda_dssim * (1.0 - fused_ssim(image.unsqueeze(0), gt_image.unsqueeze(0)))
 
         # regularization
-        lambda_normal = self.opt.lambda_normal if iteration > 7000 else 0.0
-        lambda_dist = self.opt.lambda_dist if iteration > 3000 else 0.0
-
+        # lambda_normal = self.opt.lambda_normal if iteration > 7000 else 0.0
+        # lambda_dist = self.opt.lambda_dist if iteration > 3000 else 0.0
+        lambda_normal = self.opt.lambda_normal
+        lambda_dist = self.opt.lambda_dist
+        
         rend_dist = render_pkg["rend_dist"]
         rend_normal  = render_pkg['rend_normal']
         surf_normal = render_pkg['surf_normal']
@@ -96,7 +98,7 @@ class LossFactory():
         feat_loss = get_feat_loss(surf_points, viewpoint_cam, src_viewpoint_stack, mask, resolution=self.dataset.resolution)
 
         # loss
-        total_loss = loss + dist_loss + normal_loss + dsmooth_loss + self.opt.lambda_local_pearson * Local_pearson_loss+ self.opt.lambda_pearson * pearson_loss + \
+        total_loss = loss + dist_loss + normal_loss + self.opt.lambda_dsmooth * dsmooth_loss + self.opt.lambda_local_pearson * Local_pearson_loss+ self.opt.lambda_pearson * pearson_loss + \
             self.opt.lambda_feat * feat_loss + \
             self.opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff + self.opt.lambda_normal_est * est_normal_loss
         
