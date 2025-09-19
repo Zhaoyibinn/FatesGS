@@ -190,7 +190,7 @@ def read_colmap_camera(colmap_camera_path):
     return image_W,image_H,focal_x,focal_y,cx,cy
 
 colmap_gt_root = "DTU/gt"
-def align1_camera_pose(scan,input_ply):
+def align1_camera_pose(scan,input_ply,focal_scale = None):
     vggt_pose_root = f"DTU/set_23_24_33_vggt_initok/dtu_3_images_vggt/scan{scan}/sparse/vggt"
     gt_pose_root =f"DTU/set_23_24_33/scan{scan}/sparse/0"
 
@@ -199,13 +199,16 @@ def align1_camera_pose(scan,input_ply):
     assert os.path.exists(os.path.join(gt_pose_root,"images.txt")) or os.path.exists(os.path.join(gt_pose_root,"images.bin")), "gt txt和bin文件都不存在 请检查"
 
     assert os.path.exists(os.path.join(vggt_pose_root,"points3D.ply")), "vggt points3D.ply文件不存在 请检查"
-    assert os.path.exists(os.path.join(gt_pose_root,"points3D.ply")), "colmap points3D.ply文件不存在 请检查"
+    assert os.path.exists(os.path.join(gt_pose_root,"points3D.ply")) or os.path.exists(os.path.join(gt_pose_root,"points3D_colmap.ply")), "colmap points3D.ply文件不存在 请检查"
 
     vggt_image_txt_path = os.path.join(vggt_pose_root,"images.txt")
     gt_image_txt_path = os.path.join(gt_pose_root,"images.txt")
     # vggt_ply_path = os.path.join(vggt_pose_root,"points3D.ply")
     vggt_ply_path = input_ply
-    colmap_ply_path = os.path.join(gt_pose_root,"points3D.ply")
+    if not os.path.exists(os.path.join(gt_pose_root,"points3D.ply")):
+        colmap_ply_path = os.path.join(gt_pose_root,"points3D_colmap.ply")
+    else:
+        colmap_ply_path = os.path.join(gt_pose_root,"points3D.ply")
 
     gt_intrinsic = os.path.join(gt_pose_root,"cameras.txt")
 
@@ -226,6 +229,8 @@ def align1_camera_pose(scan,input_ply):
     image_W,image_H,focal_x,focal_y,cx,cy = read_colmap_camera(gt_intrinsic)
 
     vggt_pose = read_colmap_gt(vggt_image_txt_path)
+    if focal_scale != None:
+        vggt_pose[:,:,3] = vggt_pose[:,:,3] * focal_scale
     gt_pose = read_colmap_gt(gt_image_txt_path)
 
     last_row = torch.tensor([0, 0, 0, 1]).expand(gt_pose.shape[0], 1, 4)
@@ -239,7 +244,7 @@ def align1_camera_pose(scan,input_ply):
 def align1_rescale(scan,vggt_ply_numpy_tran2colmap):
     # vggt_ply_numpy_tran2colmap = rotate_points_with_srt(torch.tensor(vggt_ply_numpy).float(),s,R,T).numpy()
     # vis_o3d_pcd_2(colmap_ply_numpy,points_trans,color1=[1,0,0],color2=[0,1,0])
-    gt_ply = o3d.io.read_point_cloud(os.path.join(colmap_gt_root,"Points","stl",f"stl0{scan}_total.ply"))
+    gt_ply = o3d.io.read_point_cloud(os.path.join(colmap_gt_root,"Points","stl",f"stl{scan:03d}_total.ply"))
     gt_ply_vdown = gt_ply.voxel_down_sample(voxel_size=10)
 
     gt_ply_numpy = np.array(gt_ply.points)
@@ -300,7 +305,7 @@ def mask_dtu(scan,vggt_plt_numpy_tran2gt_align):
     vggt_plt_numpy_tran2gt_align_rescale = (vggt_plt_numpy_tran2gt_align - scale_mat[:3, 3][None]) / scale_mat[0, 0]
 
     for scale_mat, world_mat in zip(scale_mats, world_mats):
-
+        
         P = world_mat @ scale_mat
         P = P[:3, :4]
         intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
@@ -323,6 +328,7 @@ def mask_dtu(scan,vggt_plt_numpy_tran2gt_align):
     vertices = torch.from_numpy(vggt_plt_numpy_tran2gt_align_rescale).cuda()
     mask = mask_filter(vertices, n_images, pose_all, intrinsics_all, masks)
     vggt_plt_numpy_tran2gt_align_rescale_masked = vggt_plt_numpy_tran2gt_align_rescale[mask]
+    # vggt_plt_numpy_tran2gt_align_rescale_masked = vggt_plt_numpy_tran2gt_align_rescale
 
     vggt_plt_numpy_tran2gt_align_masked = vggt_plt_numpy_tran2gt_align_rescale_masked * scale_mat[0, 0] + scale_mat[:3, 3][None]
 

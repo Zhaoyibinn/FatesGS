@@ -4,11 +4,11 @@ import numpy as np
 import copy
 from teaser_helpers import *
 
-VOXEL_SIZE = 10
+# VOXEL_SIZE = 10
 VISUALIZE = False
 
 
-def teaser_reg(A_pcd_raw,B_pcd_raw):
+def teaser_reg(A_pcd_raw,B_pcd_raw,VOXEL_SIZE = 10):
 # Load and visualize two point clouds from 3DMatch dataset
 # A_pcd_raw = o3d.io.read_point_cloud('/home/zhaoyibin/3DRE/3DGS/FatesGS/source.ply')
 # B_pcd_raw = o3d.io.read_point_cloud('/home/zhaoyibin/3DRE/3DGS/FatesGS/target.ply')
@@ -18,8 +18,10 @@ def teaser_reg(A_pcd_raw,B_pcd_raw):
     #     o3d.visualization.draw_geometries([A_pcd_raw,B_pcd_raw]) # plot A and B 
 
     # voxel downsample both clouds
+    
     A_pcd = A_pcd_raw.voxel_down_sample(voxel_size=VOXEL_SIZE)
     B_pcd = B_pcd_raw.voxel_down_sample(voxel_size=VOXEL_SIZE)
+
     # if VISUALIZE:
     #     o3d.visualization.draw_geometries([A_pcd,B_pcd]) # plot downsampled A and B 
 
@@ -61,6 +63,10 @@ def teaser_reg(A_pcd_raw,B_pcd_raw):
     R_teaser = solution.rotation * solution.scale
     t_teaser = solution.translation
     T_teaser = Rt2T(R_teaser,t_teaser)
+
+    A_pcd_T_teaser = copy.deepcopy(A_pcd).transform(T_teaser)
+
+    return A_pcd,B_pcd,A_pcd_T_teaser,T_teaser
 
     # Visualize the registration results
     A_pcd_T_teaser = copy.deepcopy(A_pcd).transform(T_teaser)

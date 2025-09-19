@@ -78,6 +78,8 @@ class PipelineParams(ParamGroup):
         self.resolution_mode = "const"
         self.densify_mode = "free"
         self.max_n_gaussian = -1
+
+        self.extra_pose = False
         super().__init__(parser, "Pipeline Parameters")
 
 class OptimizationParams(ParamGroup):
@@ -91,6 +93,8 @@ class OptimizationParams(ParamGroup):
         self.opacity_lr = 0.05
         self.scaling_lr = 0.005
         self.rotation_lr = 0.001
+        self.extra_q_lr = 1e-5
+        self.extra_t_lr = 1e-5
         self.percent_dense = 0.01
         self.lambda_dssim = 0.2
         self.lambda_dist = 10000.0
@@ -98,11 +102,12 @@ class OptimizationParams(ParamGroup):
         self.lambda_feat = 1.5
         self.lambda_depth = 10.0
         
+        
         self.opacity_cull = 0.1
 
         self.densification_interval = 100
         self.opacity_reset_interval = 1000
-        self.densify_from_iter = 0
+        self.densify_from_iter = 1000
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
         self.densify_grad_abs_threshold = 0.0008

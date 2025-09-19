@@ -52,6 +52,7 @@ if __name__ == "__main__":
 
     dataset, iteration, pipe,opt = model.extract(args), args.iteration, pipeline.extract(args),op.extract(args)
     gaussians = GaussianModel(dataset.sh_degree)
+    
     dataset.dust3r = False
     dataset.mvs_filter = False
     dataset.render = True

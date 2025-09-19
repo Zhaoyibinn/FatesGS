@@ -61,6 +61,9 @@ class Scene:
             scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval, args)
             print("默认采用colmap格式")
 
+
+
+
         if not self.loaded_iter:
             with open(scene_info.ply_path, 'rb') as src_file, open(os.path.join(self.model_path, "input.ply") , 'wb') as dest_file:
                 dest_file.write(src_file.read())
@@ -95,7 +98,10 @@ class Scene:
                 print("Loading Diffusion Training Cameras")
                 self.train_cameras_diff[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras_diff, resolution_scale, args,mvs_filter_masks = self.mvs_filter_masks)
 
-
+        train_max = len(self.train_cameras[1])
+        test_max = len(self.test_cameras[1])
+        cameras_idx_max = max(train_max,test_max)
+        self.gaussians.cameras_idx_max = cameras_idx_max
 
 
         if args.init == 'vggt_gs':
@@ -105,12 +111,21 @@ class Scene:
                                                            "point_cloud",
                                                            "iteration_" + str(self.loaded_iter),
                                                            "point_cloud.ply"))
+            extra_trans_pth = os.path.join(self.model_path,"point_cloud","iteration_" + str(self.loaded_iter),"extra_trans.pth")
+            if os.path.isfile(extra_trans_pth):
+                self.gaussians.init_extra_pose()
+                self.gaussians.load_extra_pose(extra_trans_pth)
+                print(f"找到优化的pose")
+            else:
+                self.gaussians.init_extra_pose()
+                print(f"没有找到优化的pose 单位初始化")
         else:
             
             if scene_info.ply_path.rsplit('/',1)[1].split('.')[0].endswith("mvsgs"):
                 self.gaussians.load_ply(scene_info.ply_path)
             else:
                 self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
+
 
     def mvs_filter(self,train_cameras):
         
@@ -168,7 +183,7 @@ class Scene:
     def save(self, iteration):
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
         self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
-
+        self.gaussians.save_extra_trans(os.path.join(point_cloud_path, "extra_trans.pth"))
     def getTrainCameras(self, scale=1.0):
         return self.train_cameras[scale]
     

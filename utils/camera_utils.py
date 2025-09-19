@@ -76,8 +76,13 @@ def loadCam(args, id, cam_info, resolution_scale,mvs_filter_masks = []):
         resolution = (int(orig_w / scale), int(orig_h / scale))
 
     if len(cam_info.image.split()) > 3:
-        resized_image_rgb = torch.cat([PILtoTorch(im, resolution) for im in cam_info.image.split()[:3]], dim=0)
-        loaded_mask = PILtoTorch(cam_info.image.split()[3], resolution) # (1, H, W)
+        import torch
+        rgb_channels = [PILtoTorch(im, resolution) for im in cam_info.image.split()[:3]]
+        alpha_channel = PILtoTorch(cam_info.image.split()[3], resolution)
+        resized_image_rgb = torch.cat(rgb_channels, dim=0)
+        # 将透明区域（alpha=0）设为黑色
+        resized_image_rgb = resized_image_rgb * (alpha_channel > 0)
+        loaded_mask = alpha_channel
         gt_image = resized_image_rgb
     else:
         resized_image_rgb = PILtoTorch(cam_info.image, resolution)

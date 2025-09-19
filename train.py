@@ -99,8 +99,8 @@ def culling(xyz, cams, expansion=2):
     y_min = scene_center[1] - span_y / 2
     y_max = scene_center[1] + span_y / 2
 
-    z_min = scene_center[2] - span_x / 2
-    z_max = scene_center[2] + span_x / 2
+    z_min = scene_center[2] - span_z / 2
+    z_max = scene_center[2] + span_z / 2
 
 
     valid_mask = (xyz[:, 0] > x_min) & (xyz[:, 0] < x_max) & \
@@ -288,10 +288,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if iteration % 10 == 0:
                 loss_dict = {
                     "Loss": f"{ema_loss_for_log:.{5}f}",
-                    "distort": f"{ema_dist_for_log:.{5}f}",
-                    "normal": f"{ema_normal_for_log:.{5}f}",
                     "Points": f"{len(gaussians.get_xyz)}"
                 }
+                # loss_dict = {
+                #     "Loss": f"{ema_loss_for_log:.{5}f}",
+                #     "distort": f"{ema_dist_for_log:.{5}f}",
+                #     "normal": f"{ema_normal_for_log:.{5}f}",
+                #     "Points": f"{len(gaussians.get_xyz)}"
+                # }
                 progress_bar.set_postfix(loss_dict)
 
                 progress_bar.update(10)
@@ -332,37 +336,38 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
                         gaussians.densify_and_scale_split(opt.densify_grad_threshold, opt.opacity_cull, scene.cameras_extent, opt.max_screen_size, opt.densify_scale_factor, scene_mask, N=3, no_grad=True)
                     elif opt.split == "mix":
-                        grads = gaussians.xyz_gradient_accum / gaussians.denom
-                        grads[grads.isnan()] = 0.0
-                        grads_abs = gaussians.xyz_gradient_accum_abs / gaussians.denom
-                        grads_abs[grads_abs.isnan()] = 0.0
+                        # grads = gaussians.xyz_gradient_accum / gaussians.denom
+                        # grads[grads.isnan()] = 0.0
+                        # grads_abs = gaussians.xyz_gradient_accum_abs / gaussians.denom
+                        # grads_abs[grads_abs.isnan()] = 0.0
                         # gaussians.densify_and_clone(grads, opt.densify_grad_threshold, scene.cameras_extent)
 
                         # Apply DashGaussian primitive scheduler to control densification.
+                        scene_mask, scene_center = culling(gaussians.get_xyz, scene.getTrainCameras())
+                        # 这个主要是用来确定可视区域的 但是对于DTU来说z轴的可视太奇怪了 所以暂时在后面是弃用的
                         densify_rate = scheduler.get_densify_rate(iteration, gaussians.get_xyz.shape[0], render_scale)
-                        # print(f"Densify Rate {densify_rate}")
-                        # momentum_add = gaussians.prune_and_densify_dash(opt.densify_grad_threshold, 0.005, scene.cameras_extent, 
-                        #                                         size_threshold, radii, densify_rate=densify_rate)
-                        if opt.absgs:
-                            momentum_add = gaussians.densify_and_split_absorigin(grads, opt.densify_grad_threshold,grads_abs, opt.densify_grad_abs_threshold, scene.cameras_extent,densify_rate = densify_rate)
-                            scheduler.update_momentum(momentum_add)
-                            render_scale = scheduler.get_res_scale(iteration)
-                            
-                        else:
-                            gaussians.densify_and_split(grads, opt.densify_grad_threshold, scene.cameras_extent)
-
+                        momentum_add = gaussians.densify_and_mix_prune(opt.densify_grad_threshold, opt.densify_grad_abs_threshold, opt.opacity_cull, scene.cameras_extent, size_threshold,opt,scene,scene_mask,opt.absgs,densify_rate = densify_rate)
+                        scheduler.update_momentum(momentum_add)
+                        render_scale = scheduler.get_res_scale(iteration)
+                        print("render scale", render_scale)
+                        
 
                     
                     # # gaussians.prune_large_and_transparent(0.005, 10.0)
 
                 # TrimGS
                 if opt.trim and iteration == 1:
+                    origin_num = len(gaussians.get_xyz)
                     prune_low_contribution_gaussians(gaussians, all_cameras, pipe, background, K=5, prune_ratio=opt.contribution_prune_ratio)
-                    print(f'Num gs after contribution prune: {len(gaussians.get_xyz)}')
+                    pruned_num = len(gaussians.get_xyz)
+                    print(f'修建到{round(pruned_num/origin_num * 100, 2)}%的点 从{origin_num}到{pruned_num}')
                     print(f'在初始帧修剪')
                 if opt.trim and iteration > opt.contribution_prune_from_iter and iteration % opt.contribution_prune_interval == 0:
+                    origin_num = len(gaussians.get_xyz)
                     prune_low_contribution_gaussians(gaussians, all_cameras, pipe, background, K=5, prune_ratio=opt.contribution_prune_ratio)
-                    print(f'Num gs after contribution prune: {len(gaussians.get_xyz)}')
+                    pruned_num = len(gaussians.get_xyz)
+                    print(f'修建到{round(pruned_num/origin_num * 100, 2)}%的点 从{origin_num}到{pruned_num}')
+                    
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
