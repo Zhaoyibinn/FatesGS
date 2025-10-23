@@ -105,7 +105,11 @@ class Scene:
 
 
         if args.init == 'vggt_gs':
-            self.gaussians.load_ply(os.path.join(args.source_path,"sparse","0","points3D_GS.ply"))
+            if os.path.exists(os.path.join(args.source_path,"sparse","0","points3D_GS.ply")):
+                
+                self.gaussians.load_ply(os.path.join(args.source_path,"sparse","0","points3D_GS.ply"))
+            else:
+                self.gaussians.load_ply(os.path.join(args.source_path,"sparse","0","GS.ply"))
         elif self.loaded_iter:
             self.gaussians.load_ply(os.path.join(self.model_path,
                                                            "point_cloud",
@@ -125,6 +129,7 @@ class Scene:
                 self.gaussians.load_ply(scene_info.ply_path)
             else:
                 self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
+                # self.gaussians.create_from_pcd_normal(scene_info.point_cloud, self.cameras_extent*2)
 
 
     def mvs_filter(self,train_cameras):

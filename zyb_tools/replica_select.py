@@ -3,16 +3,20 @@ import cv2
 
 import shutil
 
-# idx_num = [0,762,802] # office0
+# idx_num = [0,762,802] # office0_old
+
+
+
+# idx_num = [752,812,840] # office0_old
 # idx_num = [1714,1205,1031] #office1
-idx_num = [0,289,422] #office2
+# idx_num = [0,289,422] #office2
 # idx_num = [0,174,520] #room0
-# idx_num = [639,1158,860] #room1
+idx_num = [639,1158,860] #room1
 
 root_path = "Replica/replica_gsicpslam"
-scene_name = "office2"
+scene_name = "room1"
 
-scene_sparse_name = scene_name + "_sparse"
+scene_sparse_name = scene_name + "_sparse_vggt"
 scene_path = os.path.join(root_path,scene_name)
 scene_sparse_path = os.path.join(root_path,scene_sparse_name)
 
@@ -20,7 +24,9 @@ scene_sparse_path = os.path.join(root_path,scene_sparse_name)
     
 
 colmap_img_path = os.path.join(scene_path,"images_colmap")
+colmap_depth_path = os.path.join(scene_path,"depth_images")
 colmap_img_sparse_path = os.path.join(scene_sparse_path,"images")
+colmap_depth_sparse_path = os.path.join(scene_sparse_path,"depth_images")
 
 if os.path.exists(scene_sparse_path):
 
@@ -28,17 +34,23 @@ if os.path.exists(scene_sparse_path):
 
 os.mkdir(scene_sparse_path)
 os.mkdir(colmap_img_sparse_path)
+os.mkdir(colmap_depth_sparse_path)
 os.makedirs(os.path.join(scene_sparse_path,"sparse","gt"), exist_ok=True)
 
 final_idx = 0
 
 for i in idx_num:
     img_name = f"{i}.png"
+    depth_name = f"depth{i:06d}.png"
     img_path = os.path.join(colmap_img_path,img_name)
+    depth_path = os.path.join(colmap_depth_path,depth_name)
+
     
     img_sparse_path = os.path.join(colmap_img_sparse_path,f"{final_idx:04d}.png")
+    depth_sparse_path = os.path.join(colmap_depth_sparse_path,f"{final_idx:04d}_depth.png")
     final_idx += 1 
     shutil.copy(img_path,img_sparse_path)
+    shutil.copy(depth_path,depth_sparse_path)
 
 
 colmap_img_path_recon = os.path.join(scene_path,"sparse","gt")

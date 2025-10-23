@@ -65,8 +65,8 @@ def teaser_reg(A_pcd_raw,B_pcd_raw,VOXEL_SIZE = 10):
     T_teaser = Rt2T(R_teaser,t_teaser)
 
     A_pcd_T_teaser = copy.deepcopy(A_pcd).transform(T_teaser)
-
-    return A_pcd,B_pcd,A_pcd_T_teaser,T_teaser
+    # print("注意 没有采用ICP精配准")
+    # return A_pcd,B_pcd,A_pcd_T_teaser,T_teaser
 
     # Visualize the registration results
     A_pcd_T_teaser = copy.deepcopy(A_pcd).transform(T_teaser)

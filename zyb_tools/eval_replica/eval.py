@@ -37,8 +37,8 @@ if __name__ == '__main__':
     parser.add_argument('--vis_out_dir', type=str, default='.')
     parser.add_argument('--downsample_density', type=float, default=0.01)
     parser.add_argument('--patch_size', type=float, default=60)
-    parser.add_argument('--max_dist', type=float, default=0.1)
-    parser.add_argument('--visualize_threshold', type=float, default=10)
+    parser.add_argument('--max_dist', type=float, default=0.2)
+    parser.add_argument('--visualize_threshold', type=float, default=0.2)
     args = parser.parse_args()
 
     # print(train_conf)
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     data_in = data_down
     pbar.update(1)
     pbar.set_description('read STL pcd')
-    stl_pcd = o3d.io.read_point_cloud(f'{args.dataset_dir}/gt_pcd.ply')
+    stl_pcd = o3d.io.read_point_cloud(f'{args.dataset_dir}/gt_pcd_0.ply')
     stl = np.asarray(stl_pcd.points)
 
     pbar.update(1)

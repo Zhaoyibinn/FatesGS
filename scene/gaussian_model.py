@@ -23,6 +23,7 @@ from utils.general_utils import strip_symmetric, build_scaling_rotation
 import kornia
 from pytorch3d.transforms import matrix_to_quaternion,quaternion_to_matrix
 import copy
+import open3d as o3d
 
 class GaussianModel:
 
@@ -190,6 +191,59 @@ class GaussianModel:
         dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
         scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 2)
         rots = torch.rand((fused_point_cloud.shape[0], 4), device="cuda")
+
+        opacities = self.inverse_opacity_activation(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"))
+
+        self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
+        self._features_dc = nn.Parameter(features[:,:,0:1].transpose(1, 2).contiguous().requires_grad_(True))
+        self._features_rest = nn.Parameter(features[:,:,1:].transpose(1, 2).contiguous().requires_grad_(True))
+        self._scaling = nn.Parameter(scales.requires_grad_(True))
+        self._rotation = nn.Parameter(rots.requires_grad_(True))
+        self._opacity = nn.Parameter(opacities.requires_grad_(True))
+        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
+
+        self.init_extra_pose()
+
+
+    def create_from_pcd_normal(self, pcd : BasicPointCloud, spatial_lr_scale : float):
+
+        def normal_to_quaternion(normals):
+            # normals: (N, 3) numpy array, 每一行为一个法线向量
+            target = np.array([0, 0, 1], dtype=normals.dtype)
+            target = np.broadcast_to(target, normals.shape)
+            axis = np.cross(normals, target)
+            axis_norm = np.linalg.norm(axis, axis=1, keepdims=True)
+            axis = axis / (axis_norm + 1e-8)
+            cos_theta = np.sum(normals * target, axis=1, keepdims=True)
+            theta = np.arccos(np.clip(cos_theta, -1.0, 1.0))
+            half_theta = theta / 2
+            qw = np.cos(half_theta)
+            q_xyz = axis * np.sin(half_theta)
+            quat = np.concatenate([qw, q_xyz], axis=1)  # (N, 4)
+            # 归一化
+            quat = quat / (np.linalg.norm(quat, axis=1, keepdims=True) + 1e-8)
+            return quat
+        self.spatial_lr_scale = spatial_lr_scale
+        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda()
+        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().cuda())
+        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()
+        features[:, :3, 0 ] = fused_color
+        features[:, 3:, 1:] = 0.0
+
+        print("Number of points at initialisation : ", fused_point_cloud.shape[0])
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(fused_point_cloud.cpu().detach().numpy())
+        pcd.estimate_normals()
+        normals = np.asarray(pcd.normals)
+        normals = normals / np.linalg.norm(normals, axis=1, keepdims=True)
+
+        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
+        scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 2)
+
+        quats = normal_to_quaternion(normals)
+        # rots = torch.rand((fused_point_cloud.shape[0], 4), device="cuda")
+        rots = torch.tensor(quats, device="cuda").float()
 
         opacities = self.inverse_opacity_activation(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"))
 
@@ -569,7 +623,7 @@ class GaussianModel:
             selected_pts_mask = torch.logical_or(selected_pts_mask, scale_mask)
             # 在没有传入no_grad的时候判断 scale很大 or 累计grad很大的时候split
         selected_pts_mask_all_save = copy.deepcopy(selected_pts_mask)
-        topk_mask = torch.zeros_like(selected_pts_mask).index_fill(dim=0, index=torch.topk(grads.squeeze(), n_densify).indices, value=True)
+        topk_mask = torch.zeros_like(selected_pts_mask).index_fill(dim=0, index=torch.topk(padded_grad.squeeze(), n_densify).indices, value=True)
         selected_pts_mask = torch.logical_and(selected_pts_mask, topk_mask)
         print(f"Gaussian Split Num: {selected_pts_mask.sum().item()} scale过大的点: {scale_mask.sum().item()} Dash对于{round(selected_pts_mask.sum().item() / selected_pts_mask_all_save.sum().item() * 100 ,2)}%的点进行了Split")
         stds = self.get_scaling[selected_pts_mask].repeat(N,1)
@@ -628,6 +682,7 @@ class GaussianModel:
 
         self.densify_and_clone(grads, max_grad, extent)
         if absgs:
+        # if True:
             self.densify_and_split(grads_abs, max_grad_abs, extent)
         else:
             self.densify_and_split(grads, max_grad, extent)
@@ -639,7 +694,7 @@ class GaussianModel:
             big_points_vs = self.max_radii2D > max_screen_size
             big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
             prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
-        self.prune_points(prune_mask)
+        # self.prune_points(prune_mask)
 
         torch.cuda.empty_cache()
 

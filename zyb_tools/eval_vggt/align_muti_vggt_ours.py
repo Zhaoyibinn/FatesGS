@@ -22,13 +22,14 @@ import argparse
 parser = argparse.ArgumentParser(description="你的脚本说明")
 # parser.add_argument('--scans', type=int, nargs='+', help='要处理的scan编号列表')
 parser.add_argument('--input_root', type=str, required=True, help='输入根目录')
-parser.add_argument('--vggt_root', type=str, default="pilianghua_out/gs_init/pilianghua_output_gsinit/vggt_pcd")
+parser.add_argument('--vggt_root', type=str, default="pilianghua_out/gs_init/DTU/gsinit/vggt_pcd")
 args = parser.parse_args()
 
 
 
-for scan in [24 ,37 ,40 ,55 ,63 ,65 ,69 ,83, 97,105, 106, 110, 114, 118, 122]:
-# for scan in [97,105, 106, 110, 114, 118, 122]:
+# for scan in [24 ,37 ,40 ,55 ,63 ,65 ,69 ,83, 97,105, 106, 110, 114, 118, 122]:
+
+for scan in [24]:
     # scan = 24
     # vggt_origin_root = "DTU/set_23_24_33_vggt_initok/dtu_3_images_vggt"
     vggt_origin_root = args.vggt_root
@@ -57,7 +58,7 @@ for scan in [24 ,37 ,40 ,55 ,63 ,65 ,69 ,83, 97,105, 106, 110, 114, 118, 122]:
     input_ply_vggt = o3d.io.read_point_cloud(input_path_vggt)
     input_ply_2 = o3d.io.read_point_cloud(input_path_2)
 
-    s,R,t,source_ply,colmap_ply = align1_camera_pose(scan,input_path)
+    s,R,t,source_ply,colmap_ply,_,_ = align1_camera_pose(scan,input_path)
     # 和colmap位姿对齐 但是由于VGGT的位姿和内参没有那么准 所以还需要配准
     input_ply_posealign_numpy = trans_with_rst(np.array(input_ply.points),np.array(s),np.array(R),np.array(t))
     input_ply_vggt_posealign_numpy = trans_with_rst(np.array(input_ply_vggt.points),np.array(s),np.array(R),np.array(t))

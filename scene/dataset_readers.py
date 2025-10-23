@@ -164,7 +164,10 @@ def readColmapCameras(path, cam_extrinsics, cam_intrinsics, images_folder, read_
     if args.resolution == 2:
         ori_w, ori_h = 1600, 1200
     else:
-        ori_w, ori_h = 768, 576
+        # ori_w, ori_h = 768, 576
+        ori_w, ori_h = 1600, 1200
+    # ori_w, ori_h = cv2.imread(image_paths_all[0]).shape[1], cv2.imread(image_paths_all[0]).shape[0]
+    # 读取了实际文件的size
     for scale in scale_list:
         feat_ext = FeatExt().cuda()
         feat_ext.eval()

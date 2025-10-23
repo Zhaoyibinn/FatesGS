@@ -76,7 +76,7 @@ def loadCam(args, id, cam_info, resolution_scale,mvs_filter_masks = []):
         resolution = (int(orig_w / scale), int(orig_h / scale))
 
     if len(cam_info.image.split()) > 3:
-        import torch
+        
         rgb_channels = [PILtoTorch(im, resolution) for im in cam_info.image.split()[:3]]
         alpha_channel = PILtoTorch(cam_info.image.split()[3], resolution)
         resized_image_rgb = torch.cat(rgb_channels, dim=0)

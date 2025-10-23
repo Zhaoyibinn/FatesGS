@@ -34,6 +34,7 @@ from fused_ssim import fused_ssim
 from extra_model.lowpass_pt import create_lowpass_filter,apply_lowpass_filter
 import cv2
 import numpy as np
+import time
 
 from utils.loss_factory import LossFactory
 # import matplotlib
@@ -77,6 +78,9 @@ def prune_low_contribution_gaussians(gaussians, cameras, pipe, bg, K=5, prune_ra
 
     contribution = torch.stack(top_list, dim=-1).mean(-1)
     tile = torch.quantile(contribution, prune_ratio)
+    if tile == 0.0:
+        nonzero_contribution = contribution[contribution > 0]
+        tile = nonzero_contribution.min()
     prune_mask = contribution < tile
     gaussians.prune_points(prune_mask)
     torch.cuda.empty_cache()
@@ -111,6 +115,7 @@ def culling(xyz, cams, expansion=2):
     return valid_mask, scene_center
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint):
+    
     train_config = {
         "lambda_diff_l1": opt.lambda_diff_l1,
         "lambda_diff_ssim": opt.lambda_diff_ssim,
@@ -180,6 +185,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     loss_factory = LossFactory(opt, args,scene,dataset)
 
+    start_time = time.time()
     for iteration in range(first_iter, opt.iterations + 1):
         # print("render scale", render_scale)
         iter_start.record()
@@ -383,6 +389,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
 
+    print("Total Time:",time.time()-start_time)
+    total_time = time.time() - start_time
+    with open(os.path.join(scene.model_path, "training_time.txt"), "w") as time_file:
+        time_file.write(f"{total_time:.6f}")
 def prepare_output_and_logger(args):
     if not args.model_path:
         if os.getenv('OAR_JOB_ID'):
@@ -465,9 +475,12 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                         gt_image = gt_image * object_mask
 
                     gt_alpha_mask = viewpoint.gt_alpha_mask
-
-                    masked_image = image * gt_alpha_mask
-                    masked_gt_image = gt_image * gt_alpha_mask
+                    if gt_alpha_mask is not None:
+                        masked_image = image * gt_alpha_mask
+                        masked_gt_image = gt_image * gt_alpha_mask
+                    else:
+                        masked_image = image
+                        masked_gt_image = gt_image
 
                     # l1_test += l1_loss(image, gt_image).mean().double()
                     # psnr_test += psnr(image, gt_image).mean().double()
@@ -480,22 +493,22 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                 ssim_test /= len(config['cameras'])
                 print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
                 save_path = os.path.join(scene.model_path,"iter_test_result.json")
-                if iteration == 1:
-                    if os.path.exists(save_path):
-                        os.remove(save_path)
-                        print(f"已删除文件: {save_path}")
-                    with open(save_path, 'w', encoding='utf-8') as f:
-                        json.dump({}, f, ensure_ascii=False, indent=2)
+                # if iteration == 1:
+                #     if os.path.exists(save_path):
+                #         os.remove(save_path)
+                #         print(f"已删除文件: {save_path}")
+                #     with open(save_path, 'w', encoding='utf-8') as f:
+                #         json.dump({}, f, ensure_ascii=False, indent=2)
 
-                with open(save_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                data[iteration] = {}
-                data[iteration][f"psnr"] = psnr_test.item()
-                data[iteration][f"ssim"] = ssim_test.item()
-                data[iteration][f"l1"] = l1_test.item()
+                # with open(save_path, 'r', encoding='utf-8') as f:
+                #     data = json.load(f)
+                # data[iteration] = {}
+                # data[iteration][f"psnr"] = psnr_test.item()
+                # data[iteration][f"ssim"] = ssim_test.item()
+                # data[iteration][f"l1"] = l1_test.item()
 
-                with open(save_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
+                # with open(save_path, 'w', encoding='utf-8') as f:
+                #     json.dump(data, f, ensure_ascii=False, indent=2)
                 if tb_writer:
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
@@ -511,8 +524,8 @@ if __name__ == "__main__":
     parser.add_argument('--ip', type=str, default="127.0.0.1")
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_iterations", nargs="+", type=int, default=[1,500,1000,3000,5000,10000, 15_000])
-    parser.add_argument("--save_iterations", nargs="+", type=int, default=[1,500,1000,3_000,5000,10000, 15_000])
+    parser.add_argument("--test_iterations", nargs="+", type=int, default=[1000,3000,5000,10000, 15_000])
+    parser.add_argument("--save_iterations", nargs="+", type=int, default=[1000,3_000,5000,10000, 15_000])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)

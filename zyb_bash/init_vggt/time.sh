@@ -1,0 +1,5 @@
+python train.py -s Replica/replica_vggt_more/office1_sparse -m output/gsinit --split mix --trim --init vggt_gs --absgs --iterations 1000 --test_iterations 1000 --save_iterations 1000 --resolution_mode freq --densify_mode freq --extra_pose --lambda_feat 0.5
+python train.py -s Replica/replica_vggt_more/office2_sparse -m output/gsinit --split mix --trim --init vggt_gs --absgs --iterations 1000 --test_iterations 1000 --save_iterations 1000 --resolution_mode freq --densify_mode freq --extra_pose --lambda_feat 0.5
+
+python train.py -s Replica/replica_vggt_more/room0_sparse -m output/gsinit --split mix --trim --init vggt_gs --absgs --iterations 1000 --test_iterations 1000 --save_iterations 1000 --resolution_mode freq --densify_mode freq --extra_pose --lambda_feat 0.5
+python train.py -s Replica/replica_vggt_more/room1_sparse -m output/gsinit --split mix --trim --init vggt_gs --absgs --iterations 1000 --test_iterations 1000 --save_iterations 1000 --resolution_mode freq --densify_mode freq --extra_pose --lambda_feat 0.5

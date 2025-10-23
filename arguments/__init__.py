@@ -50,7 +50,7 @@ class ModelParams(ParamGroup):
         self._source_path = ""
         self._model_path = ""
         self._images = "images"
-        self._resolution = -1
+        self._resolution = 1
         self._white_background = False
         self.data_device = "cuda"
         self.eval = False
@@ -107,7 +107,7 @@ class OptimizationParams(ParamGroup):
 
         self.densification_interval = 100
         self.opacity_reset_interval = 1000
-        self.densify_from_iter = 1000
+        self.densify_from_iter = 0
         self.densify_until_iter = 15_000
         self.densify_grad_threshold = 0.0002
         self.densify_grad_abs_threshold = 0.0008
@@ -145,6 +145,9 @@ class OptimizationParams(ParamGroup):
 
         self.lambda_dust3r_depth = 0.0
         self.lambda_dust3r_normal = 0.0
+
+        self.lambda_2dgs_dist = 1.0
+        self.lambda_2dgs_normal = 1.0
 
         self.absgs = False
 

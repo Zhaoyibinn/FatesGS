@@ -36,8 +36,8 @@ def mask_filter(vertices, n_images, pose_all, intrinsics_all, masks):
     sampled_masks = []
 
     for i in tqdm(range(n_images),  desc="Culling mesh given masks"):
-        if i not in [23,24,33]:
-            continue
+        # if i not in [23,24,33]:
+        #     continue
         pose = pose_all[i]
         w2c = torch.inverse(pose).cuda()
         intrinsic = intrinsics_all[i].cuda()
@@ -192,11 +192,13 @@ def read_colmap_camera(colmap_camera_path):
 
 colmap_gt_root = "DTU/gt"
 def align1_camera_pose(scan,input_ply,focal_scale = None,extra_pose = None):
-    vggt_pose_root = f"DTU/set_23_24_33_vggt_initok/dtu_3_images_vggt/scan{scan}/sparse/vggt"
-    # vggt_pose_root = f"DTU/set_23_24_33_cfgs/scan{scan}/sparse/0"
-    # vggt_pose_root = f"DTU/set_23_23_33_freegs/scan{scan}/sparse/0"
+    vggt_pose_root = f"Replica/replica_vggt/{scan}/sparse/vggt"
+    # vggt_pose_root = f"Replica/replica_cfgs/{scan}/sparse/0"
+    # vggt_pose_root = f"Replica/replica_freegs/{scan}/sparse/0"
 
-    gt_pose_root =f"DTU/set_23_24_33/scan{scan}/sparse/0"
+
+
+    gt_pose_root =f"Replica/replica_gt/{scan}/sparse/0"
 
 
     assert os.path.exists(os.path.join(vggt_pose_root,"images.txt")) or os.path.exists(os.path.join(vggt_pose_root,"images.bin")), "vggt txt和bin文件都不存在 请检查"
@@ -207,7 +209,7 @@ def align1_camera_pose(scan,input_ply,focal_scale = None,extra_pose = None):
 
     vggt_image_txt_path = os.path.join(vggt_pose_root,"images.txt")
     gt_image_txt_path = os.path.join(gt_pose_root,"images.txt")
-    # vggt_ply_path = os.path.join(vggt_pose_root,"points3D.ply")
+    vggt_ply_path = os.path.join(vggt_pose_root,"points3D.ply")
     vggt_ply_path = input_ply
     if not os.path.exists(os.path.join(gt_pose_root,"points3D.ply")):
         colmap_ply_path = os.path.join(gt_pose_root,"points3D_colmap.ply")
@@ -233,13 +235,14 @@ def align1_camera_pose(scan,input_ply,focal_scale = None,extra_pose = None):
     image_W,image_H,focal_x,focal_y,cx,cy = read_colmap_camera(gt_intrinsic)
 
     vggt_pose = read_colmap_gt(vggt_image_txt_path)
-    if focal_scale != None:
-        vggt_pose[:,:,3] = vggt_pose[:,:,3] * focal_scale
+    # if focal_scale != None:
+    #     vggt_pose[:,:,3] = vggt_pose[:,:,3] * focal_scale
     gt_pose = read_colmap_gt(gt_image_txt_path)
 
     last_row = torch.tensor([0, 0, 0, 1]).expand(gt_pose.shape[0], 1, 4)
     gt_pose44 = torch.cat([gt_pose, last_row], dim=1)
     vggt_pose = torch.cat([vggt_pose, last_row], dim=1)
+    vggt_pose_origin = copy.deepcopy(vggt_pose)
 
     if extra_pose is not None:
         # extra_pose[:3, :4] 是 wxyz，转换为 xyzw
@@ -253,6 +256,8 @@ def align1_camera_pose(scan,input_ply,focal_scale = None,extra_pose = None):
             extra_pose_4x4[:3, :3] = rot[i]
             extra_pose_4x4[:3, 3] = t[i].squeeze()
             vggt_pose[i] = torch.matmul(extra_pose_4x4.T, vggt_pose[i])
+
+        # vggt_pose = torch.matmul(extra_pose[None,...],vggt_pose)
 
     s_2colmap, R_2colmap, T_2colmap = align_multiple_poses(vggt_pose,gt_pose44)
     SRT = torch.eye(4)
@@ -298,7 +303,7 @@ def align1_reg(source,target):
 
     # source,target,result,res = cpd_reg(source_ply,targer_ply)
 
-    source,target,result,T = teaser_reg(source_ply,targer_ply)
+    source,target,result,T = teaser_reg(source_ply,targer_ply,VOXEL_SIZE=0.07)
 
     return T
 

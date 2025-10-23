@@ -98,7 +98,7 @@ class LossFactory():
         feat_loss = get_feat_loss(surf_points, viewpoint_cam, src_viewpoint_stack, mask, resolution=self.dataset.resolution)
 
         # loss
-        total_loss = loss + dist_loss + normal_loss + self.opt.lambda_dsmooth * dsmooth_loss  + \
+        total_loss = loss + self.opt.lambda_2dgs_dist * dist_loss + self.opt.lambda_2dgs_normal * normal_loss + self.opt.lambda_dsmooth * dsmooth_loss  + \
             self.opt.lambda_feat * feat_loss + \
             self.opt.lambda_depth * depth_rank_loss + 0.5 * total_loss_diff + self.opt.lambda_normal_est * est_normal_loss
         

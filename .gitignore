@@ -35,3 +35,5 @@ gradio_huancun
 .gradio
 mvsgs_pointcloud
 forawrd_model/weights
+pilianghua_out
+test.py

@@ -140,6 +140,9 @@ if __name__ == '__main__':
     nn_engine.fit(stl)
     dist_d2s, idx_d2s = nn_engine.kneighbors(data_in_obs, n_neighbors=1, return_distance=True)
     max_dist = args.max_dist
+    
+    dist_d2s_clipped = np.clip(dist_d2s, None, max_dist)
+    # mean_d2s = dist_d2s_clipped.mean()
     mean_d2s = dist_d2s[dist_d2s < max_dist].mean()
     # if record:
     #     swanlab.log({"data2stl": mean_d2s})
@@ -154,6 +157,8 @@ if __name__ == '__main__':
 
     nn_engine.fit(data_in)
     dist_s2d, idx_s2d = nn_engine.kneighbors(stl_above, n_neighbors=1, return_distance=True)
+    dist_s2d_clipped = np.clip(dist_s2d, None, max_dist)
+    # mean_s2d = dist_s2d_clipped.mean()
     mean_s2d = dist_s2d[dist_s2d < max_dist].mean()
     # if record:
     #     swanlab.log({"stl2data": mean_s2d})
